@@ -1,0 +1,8 @@
+theme: null
+title: ForgeAI Pipeline Intelligence
+description: AI-Powered Pipeline Intelligence for Jenkins
+baseurl: /forgeai-pipeline-intelligence
+url: https://forgeai-oss.github.io
+include:
+  - index.html
+  - 404.html

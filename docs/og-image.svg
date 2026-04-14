@@ -1,0 +1,38 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="630" fill="#08090c"/>
+<rect x="0" y="0" width="1200" height="630" fill="url(#bg)" opacity="0.5"/>
+<defs>
+<radialGradient id="bg" cx="50%" cy="40%"><stop offset="0%" stop-color="#f97316" stop-opacity="0.12"/><stop offset="70%" stop-color="#08090c" stop-opacity="0"/></radialGradient>
+<linearGradient id="bar" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f97316"/><stop offset="100%" stop-color="#f59e0b"/></linearGradient>
+</defs>
+<!-- Grid lines -->
+<g stroke="#ffffff" stroke-opacity="0.02" stroke-width="1">
+<line x1="0" y1="100" x2="1200" y2="100"/><line x1="0" y1="200" x2="1200" y2="200"/>
+<line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="400" x2="1200" y2="400"/>
+<line x1="0" y1="500" x2="1200" y2="500"/>
+<line x1="200" y1="0" x2="200" y2="630"/><line x1="400" y1="0" x2="400" y2="630"/>
+<line x1="600" y1="0" x2="600" y2="630"/><line x1="800" y1="0" x2="800" y2="630"/>
+<line x1="1000" y1="0" x2="1000" y2="630"/>
+</g>
+<!-- Logo mark -->
+<text x="100" y="180" font-family="Georgia,serif" font-size="48" font-style="italic" fill="#f97316">Forge</text>
+<text x="268" y="180" font-family="Arial,sans-serif" font-size="48" font-weight="400" fill="#e8ecf4">AI</text>
+<!-- Title -->
+<text x="100" y="280" font-family="Georgia,serif" font-size="64" fill="#e8ecf4" font-weight="400">AI-Powered Pipeline</text>
+<text x="100" y="360" font-family="Georgia,serif" font-size="64" fill="#e8ecf4" font-weight="400" font-style="italic"><tspan fill="#f97316">Intelligence</tspan> for Jenkins</text>
+<!-- Subtitle -->
+<text x="100" y="430" font-family="Arial,sans-serif" font-size="24" fill="#8893a7" font-weight="300">8 AI analyzers · Multi-provider LLM · Open source · Apache 2.0</text>
+<!-- Bottom bar -->
+<rect x="0" y="610" width="1200" height="20" fill="url(#bar)"/>
+<!-- Tags -->
+<rect x="100" y="480" width="140" height="36" rx="6" fill="#1e2738" stroke="#2a3a5a" stroke-width="1"/>
+<text x="170" y="504" font-family="monospace" font-size="14" fill="#60a5fa" text-anchor="middle">code-review</text>
+<rect x="260" y="480" width="150" height="36" rx="6" fill="#1e2738" stroke="#2a3a5a" stroke-width="1"/>
+<text x="335" y="504" font-family="monospace" font-size="14" fill="#f87171" text-anchor="middle">vulnerability</text>
+<rect x="430" y="480" width="180" height="36" rx="6" fill="#1e2738" stroke="#2a3a5a" stroke-width="1"/>
+<text x="520" y="504" font-family="monospace" font-size="14" fill="#a78bfa" text-anchor="middle">architecture-drift</text>
+<rect x="630" y="480" width="170" height="36" rx="6" fill="#1e2738" stroke="#2a3a5a" stroke-width="1"/>
+<text x="715" y="504" font-family="monospace" font-size="14" fill="#2dd4bf" text-anchor="middle">release-readiness</text>
+<!-- GitHub -->
+<text x="1100" y="180" font-family="Arial,sans-serif" font-size="16" fill="#556070" text-anchor="end">github.com/forgeai-oss</text>
+</svg>

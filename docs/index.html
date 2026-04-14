@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ForgeAI — AI-Powered Pipeline Intelligence for Jenkins</title>
+<meta name="description" content="Open-source Jenkins plugin that brings AI code reviews, vulnerability analysis, architecture drift detection, and release readiness scoring to your CI/CD pipeline. Supports OpenAI, Claude, Ollama.">
+<meta name="keywords" content="Jenkins plugin, AI code review, DevOps, CI/CD, pipeline intelligence, vulnerability analysis, architecture drift, open source">
+
+<!-- Open Graph / LinkedIn -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="ForgeAI — AI-Powered Pipeline Intelligence for Jenkins">
+<meta property="og:description" content="8 specialized AI analyzers for code review, security, architecture drift, test gaps, and release readiness. Supports OpenAI, Claude, and local LLMs.">
+<meta property="og:image" content="https://saurabh-oss.github.io/forgeai-pipeline-intelligence/og-image.png">
+<meta property="og:url" content="https://saurabh-oss.github.io/forgeai-pipeline-intelligence/">
+
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg-deep: #08090c;
+  --bg-surface: #0e1117;
+  --bg-card: #151920;
+  --bg-card-hover: #1a2030;
+  --border: #1e2738;
+  --border-glow: #2a3a5a;
+  --text-primary: #e8ecf4;
+  --text-secondary: #8893a7;
+  --text-muted: #556070;
+  --accent: #f97316;
+  --accent-glow: #fb923c;
+  --accent-deep: #c2410c;
+  --ember-1: #ef4444;
+  --ember-2: #f59e0b;
+  --ember-3: #f97316;
+  --teal: #14b8a6;
+  --teal-dim: #0d9488;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-body: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'Fira Code', monospace;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent); color: #000; }
+
+/* ─── Utility ─────────────────── */
+.container { max-width: 1120px; margin: 0 auto; padding: 0 2rem; }
+.sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+
+/* ─── Grain overlay ───────────── */
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-size: 256px;
+}
+
+/* ─── Animations ──────────────── */
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+@keyframes pulse-glow { 0%,100%{opacity:.4} 50%{opacity:.9} }
+@keyframes slide-up { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fade-in { from{opacity:0} to{opacity:1} }
+@keyframes glow-border { 0%,100%{border-color:var(--border)} 50%{border-color:var(--accent)} }
+@keyframes ember-drift {
+  0%{transform:translateY(0) scale(1);opacity:.8}
+  100%{transform:translateY(-120px) scale(0);opacity:0}
+}
+@keyframes typing { from{width:0} to{width:100%} }
+@keyframes blink { 50%{border-color:transparent} }
+
+.anim-slide { opacity:0; transform:translateY(40px); transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+.anim-slide.visible { opacity:1; transform:translateY(0); }
+
+/* ─── Header / Nav ────────────── */
+nav {
+  position: fixed; top:0; left:0; right:0; z-index:100;
+  background: rgba(8,9,12,0.85); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.8rem 0;
+}
+nav .container {
+  display:flex; align-items:center; justify-content:space-between;
+}
+.nav-logo {
+  font-family: var(--font-display); font-size:1.5rem; color:var(--accent);
+  text-decoration:none; letter-spacing:-0.02em;
+}
+.nav-logo span { color: var(--text-primary); }
+.nav-links { display:flex; gap:2rem; list-style:none; }
+.nav-links a {
+  color:var(--text-secondary); text-decoration:none; font-size:0.88rem;
+  font-weight:400; transition: color 0.2s;
+}
+.nav-links a:hover { color:var(--text-primary); }
+.nav-cta {
+  background:var(--accent); color:#000; font-weight:600; font-size:0.85rem;
+  padding:0.5rem 1.2rem; border-radius:6px; text-decoration:none;
+  transition: all 0.25s; border:none; cursor:pointer;
+}
+.nav-cta:hover { background:var(--accent-glow); transform:translateY(-1px); box-shadow:0 4px 20px rgba(249,115,22,0.3); }
+
+/* ─── Hero ────────────────────── */
+.hero {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  position:relative; padding:8rem 2rem 6rem; text-align:center;
+  overflow:hidden;
+}
+.hero-bg {
+  position:absolute; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 40%, rgba(249,115,22,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 30% 60%, rgba(59,130,246,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 70% 70%, rgba(139,92,246,0.03) 0%, transparent 60%);
+}
+.hero-grid {
+  position:absolute; inset:0; z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 70%);
+}
+.hero-content { position:relative; z-index:1; max-width:780px; }
+.hero-badge {
+  display:inline-flex; align-items:center; gap:0.5rem;
+  background:var(--bg-card); border:1px solid var(--border);
+  padding:0.4rem 1rem; border-radius:999px; font-size:0.78rem;
+  color:var(--text-secondary); margin-bottom:2rem;
+  animation: slide-up 0.6s ease-out;
+}
+.hero-badge .dot { width:6px; height:6px; border-radius:50%; background:var(--teal); animation:pulse-glow 2s infinite; }
+.hero h1 {
+  font-family:var(--font-display); font-size:clamp(2.8rem,6vw,4.5rem);
+  line-height:1.1; font-weight:400; letter-spacing:-0.03em;
+  margin-bottom:1.5rem;
+  animation: slide-up 0.6s ease-out 0.1s both;
+}
+.hero h1 em { font-style:italic; color:var(--accent); }
+.hero-sub {
+  font-size:clamp(1rem,2vw,1.2rem); color:var(--text-secondary);
+  max-width:580px; margin:0 auto 2.5rem; line-height:1.8; font-weight:300;
+  animation: slide-up 0.6s ease-out 0.2s both;
+}
+.hero-actions {
+  display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;
+  animation: slide-up 0.6s ease-out 0.3s both;
+}
+.btn-primary {
+  background:var(--accent); color:#000; font-weight:600; font-size:0.95rem;
+  padding:0.85rem 2rem; border-radius:8px; text-decoration:none;
+  transition:all 0.25s; border:none; cursor:pointer; font-family:var(--font-body);
+}
+.btn-primary:hover { background:var(--accent-glow); transform:translateY(-2px); box-shadow:0 8px 30px rgba(249,115,22,0.25); }
+.btn-secondary {
+  background:transparent; color:var(--text-primary); font-weight:500;
+  font-size:0.95rem; padding:0.85rem 2rem; border-radius:8px;
+  text-decoration:none; transition:all 0.25s; border:1px solid var(--border);
+  font-family:var(--font-body);
+}
+.btn-secondary:hover { border-color:var(--text-muted); background:var(--bg-card); }
+
+/* ─── Terminal Preview ────────── */
+.terminal-wrap {
+  margin-top:4rem; animation: slide-up 0.7s ease-out 0.5s both;
+}
+.terminal {
+  background:var(--bg-surface); border:1px solid var(--border);
+  border-radius:12px; overflow:hidden; text-align:left;
+  max-width:680px; margin:0 auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03) inset;
+}
+.terminal-bar {
+  display:flex; align-items:center; gap:6px; padding:12px 16px;
+  background:var(--bg-card); border-bottom:1px solid var(--border);
+}
+.terminal-dot { width:10px; height:10px; border-radius:50%; }
+.terminal-dot:nth-child(1){background:#ef4444} .terminal-dot:nth-child(2){background:#f59e0b} .terminal-dot:nth-child(3){background:#22c55e}
+.terminal-title { margin-left:auto; font-size:0.72rem; color:var(--text-muted); font-family:var(--font-mono); }
+.terminal-body {
+  padding:1.2rem 1.5rem; font-family:var(--font-mono); font-size:0.8rem;
+  line-height:2; color:var(--text-secondary);
+}
+.terminal-body .accent { color:var(--accent); }
+.terminal-body .teal { color:var(--teal); }
+.terminal-body .blue { color:var(--blue); }
+.terminal-body .purple { color:var(--purple); }
+.terminal-body .dim { color:var(--text-muted); }
+.terminal-body .white { color:var(--text-primary); }
+
+/* ─── Section shared ──────────── */
+section { padding:7rem 0; }
+.section-label {
+  font-family:var(--font-mono); font-size:0.72rem; text-transform:uppercase;
+  letter-spacing:0.15em; color:var(--accent); margin-bottom:0.8rem;
+}
+.section-title {
+  font-family:var(--font-display); font-size:clamp(2rem,4vw,3rem);
+  line-height:1.15; font-weight:400; letter-spacing:-0.02em;
+  margin-bottom:1rem;
+}
+.section-sub {
+  color:var(--text-secondary); font-size:1.05rem; max-width:560px;
+  line-height:1.8; font-weight:300;
+}
+
+/* ─── Analyzers Grid ──────────── */
+.analyzers-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1px; margin-top:3rem;
+  background:var(--border); border:1px solid var(--border); border-radius:16px;
+  overflow:hidden;
+}
+.analyzer-card {
+  background:var(--bg-surface); padding:2rem;
+  transition:all 0.3s;
+}
+.analyzer-card:hover { background:var(--bg-card-hover); }
+.analyzer-icon {
+  width:40px; height:40px; border-radius:10px; display:flex;
+  align-items:center; justify-content:center; font-size:1.2rem;
+  margin-bottom:1rem; border:1px solid;
+}
+.analyzer-card h3 {
+  font-family:var(--font-body); font-size:1rem; font-weight:600;
+  margin-bottom:0.5rem;
+}
+.analyzer-card p {
+  font-size:0.85rem; color:var(--text-secondary); line-height:1.7;
+}
+.analyzer-card .tag {
+  display:inline-block; margin-top:0.8rem; font-family:var(--font-mono);
+  font-size:0.68rem; color:var(--text-muted); background:var(--bg-deep);
+  padding:0.2rem 0.6rem; border-radius:4px;
+}
+
+.icon-code { background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.2); color:#60a5fa; }
+.icon-shield { background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.2); color:#f87171; }
+.icon-arch { background:rgba(139,92,246,0.1); border-color:rgba(139,92,246,0.2); color:#a78bfa; }
+.icon-test { background:rgba(20,184,166,0.1); border-color:rgba(20,184,166,0.2); color:#2dd4bf; }
+.icon-dep { background:rgba(245,158,11,0.1); border-color:rgba(245,158,11,0.2); color:#fbbf24; }
+.icon-commit { background:rgba(236,72,153,0.1); border-color:rgba(236,72,153,0.2); color:#f472b6; }
+.icon-pipe { background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.2); color:#4ade80; }
+.icon-release { background:rgba(249,115,22,0.1); border-color:rgba(249,115,22,0.2); color:#fb923c; }
+
+/* ─── Provider Logos ──────────── */
+.providers-section { border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.providers-row {
+  display:flex; justify-content:center; flex-wrap:wrap; gap:2.5rem;
+  margin-top:2.5rem;
+}
+.provider {
+  display:flex; flex-direction:column; align-items:center; gap:0.6rem;
+  padding:1.5rem 2rem; border-radius:12px;
+  border:1px solid var(--border); background:var(--bg-surface);
+  transition:all 0.3s; min-width:140px;
+}
+.provider:hover { border-color:var(--border-glow); background:var(--bg-card); transform:translateY(-3px); }
+.provider-icon { font-size:2rem; }
+.provider-name { font-size:0.85rem; font-weight:500; }
+.provider-tag { font-family:var(--font-mono); font-size:0.65rem; color:var(--text-muted); }
+
+/* ─── Comparison Table ────────── */
+.comparison-section { background:var(--bg-surface); }
+.comparison-table {
+  width:100%; border-collapse:collapse; margin-top:2.5rem;
+  font-size:0.88rem;
+}
+.comparison-table th {
+  text-align:left; padding:1rem 1.2rem; font-weight:500;
+  color:var(--text-secondary); border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:0.75rem;
+  text-transform:uppercase; letter-spacing:0.08em;
+}
+.comparison-table td {
+  padding:0.9rem 1.2rem; border-bottom:1px solid var(--border);
+  color:var(--text-secondary);
+}
+.comparison-table td:first-child { color:var(--text-primary); font-weight:500; }
+.comparison-table .yes { color:var(--teal); }
+.comparison-table .no { color:var(--text-muted); }
+.comparison-table tr:hover td { background:var(--bg-card); }
+
+/* ─── Code Snippet ────────────── */
+.code-section .cols { display:grid; grid-template-columns:1fr 1fr; gap:2rem; margin-top:2.5rem; align-items:start; }
+.code-block {
+  background:var(--bg-surface); border:1px solid var(--border);
+  border-radius:12px; overflow:hidden;
+}
+.code-block-header {
+  padding:0.7rem 1rem; background:var(--bg-card);
+  border-bottom:1px solid var(--border);
+  font-family:var(--font-mono); font-size:0.72rem; color:var(--text-muted);
+}
+.code-block pre {
+  padding:1.2rem 1.5rem; font-family:var(--font-mono);
+  font-size:0.78rem; line-height:1.9; overflow-x:auto;
+  color:var(--text-secondary);
+}
+.code-block pre .kw { color:#c084fc; }
+.code-block pre .str { color:#fbbf24; }
+.code-block pre .fn { color:#60a5fa; }
+.code-block pre .cm { color:var(--text-muted); }
+.code-block pre .num { color:#f87171; }
+
+/* ─── Report Preview ──────────── */
+.report-preview {
+  margin-top:3rem; border:1px solid var(--border); border-radius:16px;
+  overflow:hidden; background:var(--bg-surface);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.report-chrome {
+  padding:10px 16px; background:var(--bg-card);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:6px;
+}
+.report-body { padding:2rem; }
+.report-kpis {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;
+  margin-bottom:2rem;
+}
+.report-kpi {
+  padding:1rem; background:var(--bg-card); border-radius:10px;
+  border:1px solid var(--border);
+}
+.report-kpi .label { font-size:0.68rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; font-family:var(--font-mono); }
+.report-kpi .value { font-size:1.6rem; font-weight:700; margin-top:0.3rem; }
+.report-bar {
+  height:6px; border-radius:3px; background:var(--bg-deep); margin-top:0.8rem;
+}
+.report-bar-fill { height:100%; border-radius:3px; transition: width 1.5s ease-out; }
+
+/* ─── Install Steps ───────────── */
+.install-steps {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:2rem; margin-top:3rem;
+}
+.install-step {
+  padding:2rem; background:var(--bg-surface); border:1px solid var(--border);
+  border-radius:14px; position:relative; transition:all 0.3s;
+}
+.install-step:hover { border-color:var(--border-glow); }
+.step-num {
+  font-family:var(--font-display); font-size:3rem; color:var(--accent);
+  opacity:0.2; position:absolute; top:1rem; right:1.2rem; line-height:1;
+}
+.install-step h3 { font-size:1rem; font-weight:600; margin-bottom:0.6rem; }
+.install-step p { font-size:0.85rem; color:var(--text-secondary); line-height:1.7; }
+.install-step code {
+  display:block; margin-top:0.8rem; background:var(--bg-deep);
+  padding:0.6rem 0.8rem; border-radius:6px; font-family:var(--font-mono);
+  font-size:0.75rem; color:var(--teal); overflow-x:auto;
+}
+
+/* ─── Built With Claude ───────── */
+.claude-section {
+  text-align:center;
+  background: linear-gradient(180deg, var(--bg-deep) 0%, rgba(139,92,246,0.04) 50%, var(--bg-deep) 100%);
+}
+.claude-badge {
+  display:inline-flex; align-items:center; gap:0.8rem;
+  background:var(--bg-card); border:1px solid rgba(139,92,246,0.3);
+  padding:1rem 2rem; border-radius:14px; margin-top:2rem;
+  transition:all 0.3s;
+}
+.claude-badge:hover { border-color:rgba(139,92,246,0.6); transform:translateY(-2px); }
+.claude-badge svg { width:32px; height:32px; }
+.claude-badge-text { text-align:left; }
+.claude-badge-text .top { font-size:0.75rem; color:var(--text-muted); }
+.claude-badge-text .bottom { font-size:0.95rem; font-weight:500; color:#c4b5fd; }
+
+/* ─── CTA / Footer ────────────── */
+.cta-section {
+  text-align:center;
+  background: radial-gradient(ellipse 60% 50% at 50% 80%, rgba(249,115,22,0.08) 0%, transparent 70%);
+}
+.cta-section .section-title { margin-bottom:1.5rem; }
+
+footer {
+  padding:3rem 0; border-top:1px solid var(--border); text-align:center;
+}
+footer p { font-size:0.8rem; color:var(--text-muted); }
+footer a { color:var(--text-secondary); text-decoration:none; }
+footer a:hover { color:var(--accent); }
+
+/* ─── Responsive ──────────────── */
+@media(max-width:768px) {
+  .nav-links { display:none; }
+  .code-section .cols { grid-template-columns:1fr; }
+  .install-steps { grid-template-columns:1fr; }
+  .report-kpis { grid-template-columns:repeat(2,1fr); }
+  .comparison-table { font-size:0.78rem; }
+  .comparison-table th, .comparison-table td { padding:0.6rem 0.8rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════ NAV ════════════ -->
+<nav>
+<div class="container">
+  <a href="#" class="nav-logo">Forge<span>AI</span></a>
+  <ul class="nav-links">
+    <li><a href="#analyzers">Analyzers</a></li>
+    <li><a href="#providers">Providers</a></li>
+    <li><a href="#comparison">Why ForgeAI</a></li>
+    <li><a href="#quickstart">Quick Start</a></li>
+    <li><a href="https://github.com/saurabh-oss/forgeai-pipeline-intelligence" target="_blank">GitHub</a></li>
+  </ul>
+  <a href="https://github.com/saurabh-oss/forgeai-pipeline-intelligence/releases" class="nav-cta" target="_blank">Download .hpi</a>
+</div>
+</nav>
+
+<!-- ════════════ HERO ════════════ -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge"><span class="dot"></span> Open Source &middot; Apache 2.0 &middot; v1.0</div>
+    <h1>AI-powered <em>pipeline intelligence</em> for Jenkins</h1>
+    <p class="hero-sub">
+      8 specialized analyzers for code review, vulnerability scanning,
+      architecture drift detection, and release readiness — directly in your CI/CD pipeline.
+    </p>
+    <div class="hero-actions">
+      <a href="https://github.com/saurabh-oss/forgeai-pipeline-intelligence" class="btn-primary" target="_blank">View on GitHub</a>
+      <a href="#quickstart" class="btn-secondary">Quick Start Guide</a>
+    </div>
+
+    <div class="terminal-wrap">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+          <span class="terminal-title">Jenkinsfile</span>
+        </div>
+        <div class="terminal-body">
+          <span class="dim">// one step — eight dimensions of intelligence</span><br>
+          <span class="purple">def</span> <span class="white">report</span> = <span class="accent">forgeAI</span>(<br>
+          &nbsp;&nbsp;analyzers: [<span class="teal">'code-review'</span>, <span class="teal">'vulnerability'</span>, <span class="teal">'architecture-drift'</span>],<br>
+          &nbsp;&nbsp;sourceGlob: <span class="teal">'src/**/*.java'</span>,<br>
+          &nbsp;&nbsp;failOnCritical: <span class="blue">true</span><br>
+          )<br>
+          <span class="dim">// → compositeScore: 7.8/10 | verdict: SHIP_IT</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════ ANALYZERS ════════════ -->
+<section id="analyzers">
+<div class="container">
+  <div class="anim-slide">
+    <div class="section-label">Analyzers</div>
+    <div class="section-title">Eight dimensions of code intelligence</div>
+    <div class="section-sub">Each analyzer uses a purpose-built, expert-level system prompt — not a generic wrapper. They understand your architecture, your tests, your dependencies.</div>
+  </div>
+
+  <div class="analyzers-grid anim-slide">
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-code">&#60;/&#62;</div>
+      <h3>AI Code Review</h3>
+      <p>SOLID principles, DRY violations, anti-patterns, error handling, naming conventions, and readability — rated 1–10 with line-level suggestions.</p>
+      <span class="tag">code-review</span>
+    </div>
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-shield">&#9632;</div>
+      <h3>Vulnerability Analysis</h3>
+      <p>OWASP Top 10 scanning, hardcoded secrets detection, injection vectors, and CWE mapping with specific remediation guidance.</p>
+      <span class="tag">vulnerability</span>
+    </div>
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-arch">&#9674;</div>
+      <h3>Architecture Drift</h3>
+      <p>Detects layer violations, circular dependencies, coupling drift, and pattern erosion across hexagonal, layered, CQRS, and microservice architectures.</p>
+      <span class="tag">architecture-drift</span>
+    </div>
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-test">&#10003;</div>
+      <h3>Test Gap Analysis</h3>
+      <p>Identifies untested code paths, missing edge cases, meaningless assertions, and suggests concrete test cases with pseudo-code.</p>
+      <span class="tag">test-gaps</span>
+    </div>
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-dep">&#9881;</div>
+      <h3>Dependency Risk</h3>
+      <p>License conflicts, unmaintained packages, unpinned versions, transitive depth analysis, and supply-chain risk scoring.</p>
+      <span class="tag">dependency-risk</span>
+    </div>
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-commit">&#10070;</div>
+      <h3>Commit Intelligence</h3>
+      <p>Commit hygiene scoring, breaking change detection, automatic changelog generation, and semantic versioning recommendations.</p>
+      <span class="tag">commit-intel</span>
+    </div>
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-pipe">&#9654;</div>
+      <h3>Pipeline Advisor</h3>
+      <p>Analyzes your Jenkinsfile itself — finds parallelization opportunities, missing caches, resource waste, and failure resilience gaps.</p>
+      <span class="tag">pipeline-advisor</span>
+    </div>
+    <div class="analyzer-card">
+      <div class="analyzer-icon icon-release">&#9733;</div>
+      <h3>Release Readiness</h3>
+      <p>Synthesizes all prior analyses into a composite verdict: SHIP_IT, CAUTION, HOLD, or BLOCK — with weighted scoring and tech-debt estimation.</p>
+      <span class="tag">release-readiness</span>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ PROVIDERS ════════════ -->
+<section id="providers" class="providers-section">
+<div class="container" style="text-align:center">
+  <div class="anim-slide">
+    <div class="section-label">LLM Providers</div>
+    <div class="section-title" style="margin-left:auto;margin-right:auto">Use any model. Cloud or local. Your choice.</div>
+    <div class="section-sub" style="margin:0.8rem auto 0">ForgeAI is provider-agnostic. Plug in OpenAI, Anthropic Claude, or run fully air-gapped with Ollama — no data ever leaves your network.</div>
+  </div>
+
+  <div class="providers-row anim-slide">
+    <div class="provider">
+      <div class="provider-icon">&#9679;</div>
+      <div class="provider-name">OpenAI</div>
+      <div class="provider-tag">GPT-4o / GPT-4o-mini</div>
+    </div>
+    <div class="provider">
+      <div class="provider-icon">&#9670;</div>
+      <div class="provider-name">Anthropic</div>
+      <div class="provider-tag">Claude Sonnet / Opus</div>
+    </div>
+    <div class="provider">
+      <div class="provider-icon">&#11044;</div>
+      <div class="provider-name">Ollama</div>
+      <div class="provider-tag">DeepSeek / CodeLlama</div>
+    </div>
+    <div class="provider">
+      <div class="provider-icon">&#9635;</div>
+      <div class="provider-name">Groq</div>
+      <div class="provider-tag">Llama 3.3 / GPT-OSS</div>
+    </div>
+    <div class="provider">
+      <div class="provider-icon">&#9645;</div>
+      <div class="provider-name">LM Studio</div>
+      <div class="provider-tag">Any GGUF model</div>
+    </div>
+    <div class="provider">
+      <div class="provider-icon">&#9881;</div>
+      <div class="provider-name">Custom</div>
+      <div class="provider-tag">Any OpenAI-compatible</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ COMPARISON ════════════ -->
+<section id="comparison" class="comparison-section">
+<div class="container">
+  <div class="anim-slide">
+    <div class="section-label">Why ForgeAI</div>
+    <div class="section-title">Not another ChatGPT wrapper</div>
+    <div class="section-sub">Purpose-built for CI/CD pipelines with capabilities no other plugin offers.</div>
+  </div>
+
+  <div class="anim-slide" style="overflow-x:auto">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>ForgeAI</th>
+          <th>Typical AI plugins</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Architecture drift detection</td><td class="yes">&#10003; Pattern-aware</td><td class="no">&#10005; Code-level only</td></tr>
+        <tr><td>Composite release scoring</td><td class="yes">&#10003; Weighted, cross-analyzer</td><td class="no">&#10005; Single-dimension</td></tr>
+        <tr><td>Pipeline self-optimization</td><td class="yes">&#10003; Analyzes Jenkinsfile itself</td><td class="no">&#10005; Not available</td></tr>
+        <tr><td>Air-gapped local LLM</td><td class="yes">&#10003; Ollama, LM Studio, vLLM</td><td class="no">&#10005; Cloud-only</td></tr>
+        <tr><td>Multi-provider support</td><td class="yes">&#10003; OpenAI + Claude + Ollama + Groq</td><td class="no">&#10005; Single vendor lock-in</td></tr>
+        <tr><td>Quality gate verdicts</td><td class="yes">&#10003; SHIP_IT / CAUTION / HOLD / BLOCK</td><td class="no">&#10005; Pass/fail only</td></tr>
+        <tr><td>Supply-chain risk analysis</td><td class="yes">&#10003; License + maintenance + depth</td><td class="no">&#10005; CVE-only</td></tr>
+        <tr><td>Auto changelog + semver</td><td class="yes">&#10003; From commit intelligence</td><td class="no">&#10005; Not available</td></tr>
+        <tr><td>Admin GUI with test button</td><td class="yes">&#10003; Full Jenkins config UI</td><td class="no">&#10005; Config-as-code only</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ CODE EXAMPLES ════════════ -->
+<section id="code" class="code-section">
+<div class="container">
+  <div class="anim-slide">
+    <div class="section-label">Usage</div>
+    <div class="section-title">Two steps. Infinite flexibility.</div>
+  </div>
+
+  <div class="cols anim-slide">
+    <div class="code-block">
+      <div class="code-block-header">Full Suite — Jenkinsfile</div>
+      <pre><span class="kw">def</span> report = <span class="fn">forgeAI</span>(
+  analyzers: [
+    <span class="str">'code-review'</span>,
+    <span class="str">'vulnerability'</span>,
+    <span class="str">'architecture-drift'</span>,
+    <span class="str">'test-gaps'</span>,
+    <span class="str">'release-readiness'</span>
+  ],
+  sourceGlob: <span class="str">'src/**/*.java'</span>,
+  contextInfo: <span class="str">'Spring Boot, hexagonal arch'</span>,
+  failOnCritical: <span class="num">true</span>,
+  criticalThreshold: <span class="num">4</span>
+)
+echo <span class="str">"Score: ${report.compositeScore}"</span></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header">Targeted Scan — Single Analyzer</div>
+      <pre><span class="kw">def</span> sec = <span class="fn">forgeAIScan</span>(
+  analyzer: <span class="str">'vulnerability'</span>,
+  source: <span class="fn">readFile</span>(<span class="str">'src/App.java'</span>),
+  context: <span class="str">'Java 17 REST API, PII data'</span>
+)
+
+<span class="kw">if</span> (sec.criticalCount > <span class="num">0</span>) {
+  <span class="fn">error</span>(<span class="str">"${sec.criticalCount} critical vulns"</span>)
+}
+
+<span class="cm">// Run analyzers in parallel stages</span>
+<span class="cm">// for maximum speed</span></pre>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ REPORT PREVIEW ════════════ -->
+<section>
+<div class="container">
+  <div class="anim-slide">
+    <div class="section-label">Reporting</div>
+    <div class="section-title">A report worth reading</div>
+    <div class="section-sub">Every build generates a self-contained HTML report with composite scoring, per-analyzer breakdowns, and actionable fixes.</div>
+  </div>
+
+  <div class="report-preview anim-slide">
+    <div class="report-chrome">
+      <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+    </div>
+    <div class="report-body">
+      <div class="report-kpis">
+        <div class="report-kpi">
+          <div class="label">Composite score</div>
+          <div class="value" style="color:var(--teal)">7.8<span style="font-size:0.8rem;color:var(--text-muted)">/10</span></div>
+        </div>
+        <div class="report-kpi">
+          <div class="label">Verdict</div>
+          <div class="value" style="color:var(--accent)">SHIP IT</div>
+        </div>
+        <div class="report-kpi">
+          <div class="label">Total findings</div>
+          <div class="value">12</div>
+        </div>
+        <div class="report-kpi">
+          <div class="label">Critical / High</div>
+          <div class="value" style="color:var(--ember-1)">1 / 3</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+            <span>Code Review</span><span style="color:var(--teal)">8/10</span>
+          </div>
+          <div class="report-bar"><div class="report-bar-fill" style="width:80%;background:var(--teal)"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin:12px 0 4px">
+            <span>Vulnerability</span><span style="color:var(--accent)">6/10</span>
+          </div>
+          <div class="report-bar"><div class="report-bar-fill" style="width:60%;background:var(--accent)"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin:12px 0 4px">
+            <span>Architecture Drift</span><span style="color:var(--teal)">9/10</span>
+          </div>
+          <div class="report-bar"><div class="report-bar-fill" style="width:90%;background:var(--teal)"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px">
+            <span>Test Gaps</span><span style="color:var(--accent)">7/10</span>
+          </div>
+          <div class="report-bar"><div class="report-bar-fill" style="width:70%;background:var(--accent)"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin:12px 0 4px">
+            <span>Dependency Risk</span><span style="color:var(--teal)">8/10</span>
+          </div>
+          <div class="report-bar"><div class="report-bar-fill" style="width:80%;background:var(--teal)"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin:12px 0 4px">
+            <span>Release Readiness</span><span style="color:var(--teal)">8/10</span>
+          </div>
+          <div class="report-bar"><div class="report-bar-fill" style="width:80%;background:var(--teal)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ QUICK START ════════════ -->
+<section id="quickstart">
+<div class="container">
+  <div class="anim-slide">
+    <div class="section-label">Quick start</div>
+    <div class="section-title">Up and running in 5 minutes</div>
+  </div>
+
+  <div class="install-steps anim-slide">
+    <div class="install-step">
+      <span class="step-num">1</span>
+      <h3>Install the plugin</h3>
+      <p>Download the <code>.hpi</code> from GitHub Releases and upload via Manage Jenkins &rarr; Plugins &rarr; Advanced.</p>
+      <code>mvn clean package -DskipTests</code>
+    </div>
+    <div class="install-step">
+      <span class="step-num">2</span>
+      <h3>Configure your LLM</h3>
+      <p>Go to Manage Jenkins &rarr; System &rarr; ForgeAI. Pick OpenAI, Claude, Groq, or Ollama. Hit Test Connection.</p>
+      <code>Provider: Groq<br>Model: llama-3.3-70b-versatile</code>
+    </div>
+    <div class="install-step">
+      <span class="step-num">3</span>
+      <h3>Add to your pipeline</h3>
+      <p>One step in your Jenkinsfile. Eight dimensions of intelligence. A report on every build.</p>
+      <code>forgeAI analyzers: ['code-review',<br>'vulnerability', 'architecture-drift']</code>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ BUILT WITH CLAUDE ════════════ -->
+<section class="claude-section">
+<div class="container">
+  <div class="anim-slide">
+    <div class="section-label">Origin story</div>
+    <div class="section-title" style="text-align:center;margin:0 auto">Built with Claude by Anthropic</div>
+    <div class="section-sub" style="text-align:center;margin:0.8rem auto 0;max-width:620px">
+      This plugin was designed, architected, and coded in collaboration with Claude — Anthropic's AI assistant.
+      From the LLM provider abstraction to the prompt engineering for each analyzer, the entire codebase
+      was pair-programmed with AI. A testament to what's possible when human architectural vision
+      meets AI execution capability.
+    </div>
+    <div style="text-align:center">
+      <a href="https://claude.ai" target="_blank" class="claude-badge" style="text-decoration:none">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="8" fill="#6B21A8" fill-opacity="0.2"/>
+          <path d="M20 8C13.373 8 8 13.373 8 20s5.373 12 12 12 12-5.373 12-12S26.627 8 20 8zm0 2c5.523 0 10 4.477 10 10s-4.477 10-10 10-10-4.477-10-10 4.477-10 10-10zm-2.5 5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm5 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM14 22a6 6 0 0012 0h-2a4 4 0 01-8 0h-2z" fill="#C4B5FD"/>
+        </svg>
+        <div class="claude-badge-text">
+          <div class="top">Pair-programmed with</div>
+          <div class="bottom">Claude &middot; Anthropic</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ CTA ════════════ -->
+<section class="cta-section">
+<div class="container" style="text-align:center">
+  <div class="anim-slide">
+    <div class="section-title">Start forging smarter pipelines today</div>
+    <p style="color:var(--text-secondary);margin-bottom:2rem;font-size:1.05rem">Open source. Apache 2.0. Free forever.</p>
+    <div class="hero-actions" style="justify-content:center">
+      <a href="https://github.com/saurabh-oss/forgeai-pipeline-intelligence" class="btn-primary" target="_blank">Star on GitHub</a>
+      <a href="https://github.com/saurabh-oss/forgeai-pipeline-intelligence/releases" class="btn-secondary" target="_blank">Download Latest Release</a>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════ FOOTER ════════════ -->
+<footer>
+<div class="container">
+  <p>
+    ForgeAI Pipeline Intelligence &middot; <a href="https://github.com/saurabh-oss/forgeai-pipeline-intelligence">GitHub</a> &middot;
+    <a href="https://github.com/saurabh-oss/forgeai-pipeline-intelligence/blob/main/LICENSE">Apache 2.0</a> &middot;
+    Built with <span style="color:var(--accent)">&hearts;</span> and Claude
+  </p>
+</div>
+</footer>
+
+<!-- ════════════ SCROLL ANIMATIONS ════════════ -->
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.anim-slide').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
