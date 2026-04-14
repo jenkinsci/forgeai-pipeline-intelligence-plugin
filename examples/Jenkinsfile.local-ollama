@@ -1,0 +1,41 @@
+/**
+ * ForgeAI — Air-gapped / Local LLM mode using Ollama.
+ *
+ * Prerequisites:
+ *   1. Install Ollama on the Jenkins agent: https://ollama.ai
+ *   2. Pull a code-focused model: ollama pull deepseek-coder:33b
+ *   3. In Jenkins global config, set:
+ *        Provider: Ollama (Local)
+ *        Endpoint: http://localhost:11434
+ *        Model: deepseek-coder:33b
+ *
+ * No API keys required. No data leaves your network.
+ */
+
+pipeline {
+    agent { label 'gpu-agent' }  // or any agent with Ollama installed
+
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('ForgeAI Local Analysis') {
+            steps {
+                script {
+                    def report = forgeAI(
+                        analyzers: ['code-review', 'vulnerability', 'test-gaps'],
+                        sourceGlob: 'src/**/*.py',
+                        contextInfo: 'Python FastAPI service, air-gapped environment'
+                    )
+                    echo "Composite Score: ${report.compositeScore}/10"
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'forgeai-reports/**', allowEmptyArchive: true
+                }
+            }
+        }
+    }
+}

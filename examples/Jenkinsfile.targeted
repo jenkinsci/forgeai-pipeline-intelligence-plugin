@@ -1,0 +1,66 @@
+/**
+ * ForgeAI — Targeted analysis using the forgeAIScan step.
+ * Use this when you want to run individual analyzers with full control.
+ */
+
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        // ── Run individual analyzers in parallel ──────────────────
+        stage('ForgeAI Targeted Scans') {
+            parallel {
+
+                stage('Security Scan') {
+                    steps {
+                        script {
+                            def code = sh(script: 'find src -name "*.java" | head -20 | xargs cat', returnStdout: true)
+                            def result = forgeAIScan(
+                                analyzer: 'vulnerability',
+                                source: code,
+                                context: 'Java 17 Spring Boot REST API'
+                            )
+                            echo "Security Score: ${result.score}/10 | Findings: ${result.findingsCount}"
+                            if (result.criticalCount > 0) {
+                                unstable("ForgeAI found ${result.criticalCount} critical vulnerabilities")
+                            }
+                        }
+                    }
+                }
+
+                stage('Architecture Check') {
+                    steps {
+                        script {
+                            def tree = sh(script: 'find src -type f | head -100', returnStdout: true)
+                            def result = forgeAIScan(
+                                analyzer: 'architecture-drift',
+                                source: tree,
+                                context: 'Expected: Hexagonal / Ports-and-Adapters architecture'
+                            )
+                            echo "Architecture Score: ${result.score}/10"
+                        }
+                    }
+                }
+
+                stage('Dependency Audit') {
+                    steps {
+                        script {
+                            def manifests = readFile('pom.xml')
+                            def result = forgeAIScan(
+                                analyzer: 'dependency-risk',
+                                source: manifests,
+                                context: 'Production Java service, no GPL allowed'
+                            )
+                            echo "Dependency Risk Score: ${result.score}/10"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

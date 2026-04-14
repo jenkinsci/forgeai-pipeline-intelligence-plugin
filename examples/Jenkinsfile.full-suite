@@ -1,0 +1,101 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════╗
+ * ║   ForgeAI Pipeline Intelligence — Example Jenkinsfile        ║
+ * ║   Full-suite analysis with quality gate                      ║
+ * ╚══════════════════════════════════════════════════════════════╝
+ */
+
+pipeline {
+    agent any
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean compile -q'  // Or your build command
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                sh 'mvn test -q'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        // ── ForgeAI: Full Analysis Suite ──────────────────────────
+        stage('ForgeAI Intelligence') {
+            steps {
+                script {
+                    def report = forgeAI(
+                        analyzers: [
+                            'code-review',
+                            'vulnerability',
+                            'architecture-drift',
+                            'test-gaps',
+                            'dependency-risk',
+                            'commit-intel',
+                            'pipeline-advisor',
+                            'release-readiness'
+                        ],
+                        sourceGlob: 'src/main/java/**/*.java,src/main/resources/**',
+                        contextInfo: 'Spring Boot microservice using hexagonal architecture',
+                        failOnCritical: true,
+                        criticalThreshold: 4
+                    )
+
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    echo "ForgeAI Composite Score: ${report.compositeScore}/10"
+                    echo "Total Findings: ${report.totalFindings}"
+                    echo "Critical Issues: ${report.criticalCount}"
+                    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                }
+            }
+            post {
+                always {
+                    // Archive the HTML report as a build artifact
+                    archiveArtifacts artifacts: 'forgeai-reports/**', allowEmptyArchive: true
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'forgeai-reports',
+                        reportFiles: 'forgeai-report.html',
+                        reportName: 'ForgeAI Report'
+                    ])
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when { branch 'main' }
+            steps {
+                echo 'Deploying...'
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo '❌ Pipeline failed — check ForgeAI report for details.'
+        }
+        success {
+            echo '✅ Pipeline passed — ForgeAI analysis complete.'
+        }
+    }
+}

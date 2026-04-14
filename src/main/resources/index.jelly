@@ -1,0 +1,7 @@
+<?jelly escape-by-default='true'?>
+<div>
+  <b>ForgeAI Pipeline Intelligence</b> — AI-powered code reviews, vulnerability analysis,
+  architecture drift detection, test gap analysis, dependency risk scoring, commit intelligence,
+  pipeline optimization, and release readiness scoring. Supports OpenAI, Anthropic Claude,
+  Ollama (local), LM Studio, and any OpenAI-compatible endpoint.
+</div>

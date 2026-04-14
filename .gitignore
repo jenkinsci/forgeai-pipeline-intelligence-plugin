@@ -1,0 +1,23 @@
+# Maven
+target/
+*.class
+*.jar
+*.hpi
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jenkins
+work/

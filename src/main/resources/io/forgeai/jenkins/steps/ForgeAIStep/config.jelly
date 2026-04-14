@@ -1,0 +1,27 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+
+  <f:entry title="Analyzers" field="analyzers"
+           description="Comma-separated list: code-review, vulnerability, architecture-drift, test-gaps, dependency-risk, commit-intel, pipeline-advisor, release-readiness">
+    <f:textbox default="code-review,vulnerability,architecture-drift,test-gaps"/>
+  </f:entry>
+
+  <f:entry title="Source File Glob" field="sourceGlob"
+           description="Glob patterns for source files to analyze (comma-separated)">
+    <f:textbox default="**/*.java,**/*.py,**/*.js,**/*.ts"/>
+  </f:entry>
+
+  <f:entry title="Additional Context" field="contextInfo"
+           description="Optional project description, architecture info, or constraints">
+    <f:textarea/>
+  </f:entry>
+
+  <f:entry title="Fail on Low Score" field="failOnCritical">
+    <f:checkbox/>
+  </f:entry>
+
+  <f:entry title="Score Threshold" field="criticalThreshold">
+    <f:textbox default="3"/>
+  </f:entry>
+
+</j:jelly>
