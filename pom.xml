@@ -103,12 +103,14 @@
         <dependency>
             <groupId>io.jenkins.plugins</groupId>
             <artifactId>okhttp-api</artifactId>
+            <version>5.3.2-200.vedb_720a_cf1f8</version>
         </dependency>
 
         <!-- JSON Processing via Jenkins API plugin (replaces direct gson bundling) -->
         <dependency>
             <groupId>io.jenkins.plugins</groupId>
             <artifactId>gson-api</artifactId>
+            <version>2.13.2-198.v45e4a_55d9b_a_a_</version>
         </dependency>
 
         <!-- Markdown to HTML for reports -->
