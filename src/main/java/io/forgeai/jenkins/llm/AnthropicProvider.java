@@ -3,6 +3,7 @@ package io.forgeai.jenkins.llm;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import hudson.util.Secret;
 import okhttp3.*;
 
 import java.io.IOException;
@@ -21,7 +22,7 @@ public class AnthropicProvider implements LLMProvider {
     private static final Gson GSON = new Gson();
 
     private final String endpoint;
-    private final String apiKey;
+    private final Secret apiKey;
     private final String model;
     private final double temperature;
     private final int timeoutSeconds;
@@ -30,7 +31,7 @@ public class AnthropicProvider implements LLMProvider {
                              double temperature, int timeoutSeconds) {
         this.endpoint = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT
                 : (endpoint.endsWith("/") ? endpoint : endpoint + "/");
-        this.apiKey = apiKey;
+        this.apiKey = Secret.fromString(apiKey);
         this.model = model;
         this.temperature = temperature;
         this.timeoutSeconds = timeoutSeconds;
@@ -62,7 +63,7 @@ public class AnthropicProvider implements LLMProvider {
                 .url(url)
                 .post(RequestBody.create(body.toString(), JSON_MEDIA))
                 .addHeader("Content-Type", "application/json")
-                .addHeader("x-api-key", apiKey)
+                .addHeader("x-api-key", Secret.toString(apiKey))
                 .addHeader("anthropic-version", API_VERSION)
                 .build();
 

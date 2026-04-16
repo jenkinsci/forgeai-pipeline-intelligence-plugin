@@ -7,13 +7,13 @@
     <parent>
         <groupId>org.jenkins-ci.plugins</groupId>
         <artifactId>plugin</artifactId>
-        <version>4.80</version>
+        <version>6.2152.ve00a_731c3ce9</version>
         <relativePath/>
     </parent>
 
-    <groupId>io.forgeai.jenkins</groupId>
+    <groupId>io.jenkins.plugins</groupId>
     <artifactId>forgeai-pipeline-intelligence</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>${changelist}</version>
     <packaging>hpi</packaging>
 
     <name>ForgeAI Pipeline Intelligence</name>
@@ -31,29 +31,20 @@
         </license>
     </licenses>
 
-    <developers>
-        <developer>
-            <id>forgeai</id>
-            <name>ForgeAI Contributors</name>
-            <email>oss@forgeai.io</email>
-        </developer>
-    </developers>
-
     <scm>
         <connection>scm:git:https://github.com/forgeai-oss/forgeai-pipeline-intelligence.git</connection>
         <developerConnection>scm:git:git@github.com:forgeai-oss/forgeai-pipeline-intelligence.git</developerConnection>
         <url>https://github.com/forgeai-oss/forgeai-pipeline-intelligence</url>
-        <tag>HEAD</tag>
+        <tag>${scmTag}</tag>
     </scm>
 
     <properties>
-        <jenkins.version>2.426.3</jenkins.version>
-        <java.version>17</java.version>
-        <java.level>17</java.level>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <maven.compiler.release>17</maven.compiler.release>
+        <jenkins.baseline>2.528</jenkins.baseline>
+        <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+        <changelist>999999-SNAPSHOT</changelist>
         <hpi.compatibleSinceVersion>1.0.0</hpi.compatibleSinceVersion>
+        <hpi.strictBundledArtifacts>true</hpi.strictBundledArtifacts>
+        <ban-commons-lang-2.skip>false</ban-commons-lang-2.skip>
         <gitHubRepo>forgeai-oss/forgeai-pipeline-intelligence</gitHubRepo>
     </properties>
 
@@ -61,54 +52,10 @@
         <dependencies>
             <dependency>
                 <groupId>io.jenkins.tools.bom</groupId>
-                <artifactId>bom-2.426.x</artifactId>
-                <version>3143.v347db_7c6db_6e</version>
+                <artifactId>bom-${jenkins.baseline}.x</artifactId>
+                <version>6269.v7a_159d68a_366</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <!-- Override ASM to upper bound version 9.7 required by scm-api:690.x / asm-api:9.7 -->
-            <dependency>
-                <groupId>org.ow2.asm</groupId>
-                <artifactId>asm</artifactId>
-                <version>9.7</version>
-            </dependency>
-            <dependency>
-                <groupId>org.ow2.asm</groupId>
-                <artifactId>asm-commons</artifactId>
-                <version>9.7</version>
-            </dependency>
-            <dependency>
-                <groupId>org.ow2.asm</groupId>
-                <artifactId>asm-tree</artifactId>
-                <version>9.7</version>
-            </dependency>
-            <dependency>
-                <groupId>org.ow2.asm</groupId>
-                <artifactId>asm-analysis</artifactId>
-                <version>9.7</version>
-            </dependency>
-            <dependency>
-                <groupId>org.ow2.asm</groupId>
-                <artifactId>asm-util</artifactId>
-                <version>9.7</version>
-            </dependency>
-            <!-- Override gson to upper bound version 2.11.0 required by git-client via gson-api -->
-            <dependency>
-                <groupId>com.google.code.gson</groupId>
-                <artifactId>gson</artifactId>
-                <version>2.11.0</version>
-            </dependency>
-            <!-- Override kotlin-stdlib-jdk8 to upper bound version 1.9.10 required by okio-jvm -->
-            <dependency>
-                <groupId>org.jetbrains.kotlin</groupId>
-                <artifactId>kotlin-stdlib-jdk8</artifactId>
-                <version>1.9.10</version>
-            </dependency>
-            <!-- Override error_prone_annotations to upper bound version 2.27.0 required by gson:2.11.0 -->
-            <dependency>
-                <groupId>com.google.errorprone</groupId>
-                <artifactId>error_prone_annotations</artifactId>
-                <version>2.27.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -152,17 +99,16 @@
             <artifactId>git</artifactId>
         </dependency>
 
-        <!-- HTTP Client for LLM API calls -->
+        <!-- HTTP Client via Jenkins API plugin (replaces direct okhttp3 bundling) -->
         <dependency>
-            <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>okhttp</artifactId>
-            <version>4.12.0</version>
+            <groupId>io.jenkins.plugins</groupId>
+            <artifactId>okhttp-api</artifactId>
         </dependency>
 
-        <!-- JSON Processing -->
+        <!-- JSON Processing via Jenkins API plugin (replaces direct gson bundling) -->
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
+            <groupId>io.jenkins.plugins</groupId>
+            <artifactId>gson-api</artifactId>
         </dependency>
 
         <!-- Markdown to HTML for reports -->
@@ -203,32 +149,6 @@
 
     <build>
         <plugins>
-            <!-- Disable parent-bound license:process — embedded Groovy uses old ASM,
-                 incompatible with Java 25 class files (major version 69). -->
-            <plugin>
-                <groupId>io.jenkins.tools.maven</groupId>
-                <artifactId>license-maven-plugin</artifactId>
-                <version>133.v48b_64c1fc6b_4</version>
-                <executions>
-                    <execution>
-                        <id>default</id>
-                        <phase>none</phase>
-                    </execution>
-                </executions>
-            </plugin>
-            <!-- Disable parent-bound spotbugs:check — SpotBugs 4.8.3.1 bundles old ASM,
-                 incompatible with Java 25 class files (major version 69). -->
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.8.3.1</version>
-                <executions>
-                    <execution>
-                        <id>spotbugs</id>
-                        <phase>none</phase>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.jenkins-ci.tools</groupId>
                 <artifactId>maven-hpi-plugin</artifactId>
@@ -256,8 +176,6 @@
                 <executions>
                     <execution>
                         <goals><goal>prepare-agent</goal></goals>
-                        <!-- Exclude HtmlUnit's StyleAttributes$Definition: its <clinit> is already
-                             near the JVM 64 KB method limit; JaCoCo probes push it over. -->
                         <configuration>
                             <excludes>
                                 <exclude>org/htmlunit/css/StyleAttributes$Definition</exclude>
