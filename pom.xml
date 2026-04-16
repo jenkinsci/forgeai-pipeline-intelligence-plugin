@@ -22,7 +22,7 @@
         Architecture Drift Detection, Test Gap Analysis, Release Readiness Scoring, and more.
         Supports OpenAI, Anthropic Claude, Ollama (local), LM Studio, and custom LLM endpoints.
     </description>
-    <url>https://github.com/forgeai-oss/forgeai-pipeline-intelligence</url>
+    <url>https://github.com/saurabh-oss/forgeai-pipeline-intelligence</url>
 
     <licenses>
         <license>
@@ -32,9 +32,9 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:https://github.com/forgeai-oss/forgeai-pipeline-intelligence.git</connection>
-        <developerConnection>scm:git:git@github.com:forgeai-oss/forgeai-pipeline-intelligence.git</developerConnection>
-        <url>https://github.com/forgeai-oss/forgeai-pipeline-intelligence</url>
+        <connection>scm:git:https://github.com/saurabh-oss/forgeai-pipeline-intelligence.git</connection>
+        <developerConnection>scm:git:git@github.com:saurabh-oss/forgeai-pipeline-intelligence.git</developerConnection>
+        <url>https://github.com/saurabh-oss/forgeai-pipeline-intelligence</url>
         <tag>${scmTag}</tag>
     </scm>
 
@@ -45,7 +45,7 @@
         <hpi.compatibleSinceVersion>1.0.0</hpi.compatibleSinceVersion>
         <hpi.strictBundledArtifacts>true</hpi.strictBundledArtifacts>
         <ban-commons-lang-2.skip>false</ban-commons-lang-2.skip>
-        <gitHubRepo>forgeai-oss/forgeai-pipeline-intelligence</gitHubRepo>
+        <gitHubRepo>saurabh-oss/forgeai-pipeline-intelligence</gitHubRepo>
     </properties>
 
     <dependencyManagement>
