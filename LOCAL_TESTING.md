@@ -268,6 +268,6 @@ Before pushing to GitHub and submitting to the Jenkins plugin registry:
 - [ ] `Test Connection` button works in admin UI
 - [ ] Pipeline Snippet Generator shows ForgeAI steps correctly
 - [ ] No hardcoded API keys or secrets in the codebase
-- [ ] LICENSE file is present (Apache 2.0)
+- [ ] LICENSE file is present (MIT)
 - [ ] README.md is comprehensive
 - [ ] CONTRIBUTING.md is present

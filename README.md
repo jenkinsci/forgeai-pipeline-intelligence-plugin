@@ -3,7 +3,7 @@
 ### AI-Powered Code Reviews, Security Analysis, Architecture Drift Detection & Release Readiness — Directly in Your Jenkins Pipeline
 
 [![CI](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Jenkins Plugin](https://img.shields.io/badge/Jenkins-2.426.3%2B-blue.svg)](https://www.jenkins.io/)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://adoptium.net)
 
@@ -400,7 +400,7 @@ Key areas where help is particularly valuable:
 
 ## License
 
-[Apache License 2.0](LICENSE)
+[MIT License](LICENSE)
 
 ---
 
