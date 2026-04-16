@@ -3,6 +3,7 @@ package io.forgeai.jenkins.llm;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import hudson.util.Secret;
 import okhttp3.*;
 
 import java.io.IOException;
@@ -20,7 +21,7 @@ public class OpenAICompatibleProvider implements LLMProvider {
     private static final Gson GSON = new Gson();
 
     private final String endpoint;
-    private final String apiKey;
+    private final Secret apiKey;
     private final String model;
     private final double temperature;
     private final int timeoutSeconds;
@@ -28,7 +29,7 @@ public class OpenAICompatibleProvider implements LLMProvider {
     public OpenAICompatibleProvider(String endpoint, String apiKey, String model,
                                     double temperature, int timeoutSeconds) {
         this.endpoint = endpoint.endsWith("/") ? endpoint : endpoint + "/";
-        this.apiKey = apiKey;
+        this.apiKey = Secret.fromString(apiKey);
         this.model = model;
         this.temperature = temperature;
         this.timeoutSeconds = timeoutSeconds;
@@ -67,8 +68,9 @@ public class OpenAICompatibleProvider implements LLMProvider {
                 .post(RequestBody.create(body.toString(), JSON_MEDIA))
                 .addHeader("Content-Type", "application/json");
 
-        if (apiKey != null && !apiKey.isBlank()) {
-            reqBuilder.addHeader("Authorization", "Bearer " + apiKey);
+        String apiKeyPlain = Secret.toString(apiKey);
+        if (apiKeyPlain != null && !apiKeyPlain.isBlank()) {
+            reqBuilder.addHeader("Authorization", "Bearer " + apiKeyPlain);
         }
 
         try (Response response = client.newCall(reqBuilder.build()).execute()) {

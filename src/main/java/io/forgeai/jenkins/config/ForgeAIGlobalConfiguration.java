@@ -16,6 +16,7 @@ import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.verb.POST;
 import io.forgeai.jenkins.llm.*;
 
 import java.util.Collections;
@@ -83,21 +84,27 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
     }
 
     // ── Validation helpers shown in real-time in the UI ────────────────
+    @POST
     public FormValidation doCheckLlmEndpoint(@QueryParameter String value) {
+        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         if (value == null || value.isBlank()) return FormValidation.error("Endpoint is required");
         if (!value.startsWith("http")) return FormValidation.error("Must start with http:// or https://");
         return FormValidation.ok();
     }
 
+    @POST
     public FormValidation doCheckModelId(@QueryParameter String value) {
+        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         if (value == null || value.isBlank()) return FormValidation.error("Model ID is required");
         return FormValidation.ok();
     }
 
+    @POST
     public FormValidation doTestConnection(@QueryParameter String providerType,
                                            @QueryParameter String llmEndpoint,
                                            @QueryParameter String modelId,
                                            @QueryParameter String apiKeyCredentialId) {
+        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         try {
             // Temporarily build a provider for the test
             ForgeAIGlobalConfiguration temp = new ForgeAIGlobalConfiguration();
@@ -118,6 +125,7 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
     }
 
     /** Populate the API-key credential dropdown. */
+    @POST
     public ListBoxModel doFillApiKeyCredentialIdItems(@QueryParameter String apiKeyCredentialId) {
         if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
             return new StandardListBoxModel().includeCurrentValue(apiKeyCredentialId);
