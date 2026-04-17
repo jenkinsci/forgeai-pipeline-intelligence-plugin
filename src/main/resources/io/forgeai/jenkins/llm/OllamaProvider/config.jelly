@@ -1,0 +1,18 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+
+  <f:entry title="Endpoint" field="endpoint"
+           description="Ollama server URL. Default: http://localhost:11434">
+    <f:textbox default="http://localhost:11434"/>
+  </f:entry>
+
+  <f:entry title="Model ID" field="modelId"
+           description="E.g. codellama:13b, deepseek-coder:33b, llama3, mistral, phi3">
+    <f:textbox default="codellama:13b"/>
+  </f:entry>
+
+  <f:validateButton title="Test Connection" progress="Testing..."
+                    method="testConnection"
+                    with="endpoint"/>
+
+</j:jelly>

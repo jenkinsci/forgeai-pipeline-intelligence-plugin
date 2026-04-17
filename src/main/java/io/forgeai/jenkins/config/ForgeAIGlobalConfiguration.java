@@ -1,25 +1,17 @@
 package io.forgeai.jenkins.config;
 
-import com.cloudbees.plugins.credentials.CredentialsMatchers;
-import com.cloudbees.plugins.credentials.CredentialsProvider;
-import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
-import com.cloudbees.plugins.credentials.domains.DomainRequirement;
 import hudson.Extension;
-import hudson.security.ACL;
 import hudson.util.FormValidation;
-import hudson.util.ListBoxModel;
+import io.forgeai.jenkins.llm.LLMProvider;
+import io.forgeai.jenkins.llm.LLMProvider.LLMProviderDescriptor;
+import io.forgeai.jenkins.llm.OpenAICompatibleProvider;
 import jenkins.model.GlobalConfiguration;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.jenkinsci.Symbol;
-import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.DataBoundSetter;
-import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.verb.POST;
-import io.forgeai.jenkins.llm.*;
-
-import java.util.Collections;
 
 /**
  * Global configuration page for ForgeAI Pipeline Intelligence.
@@ -29,29 +21,28 @@ import java.util.Collections;
 @Symbol("forgeAI")
 public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
 
-    // ── LLM Provider Settings ──────────────────────────────────────────
-    private String providerType = "openai";          // openai | anthropic | ollama
-    private String llmEndpoint = "https://api.openai.com/";
-    private String modelId = "gpt-4o";
-    private String apiKeyCredentialId = "";
-    private double temperature = 0.2;
+    // ── LLM Provider (selected via hetero-radio) ───────────────────
+    private LLMProvider provider = new OpenAICompatibleProvider();
+
+    // ── Common LLM call settings ───────────────────────────────────
+    private double temperature    = 0.2;
     private int    timeoutSeconds = 120;
-    private int    maxTokens = 4096;
+    private int    maxTokens      = 4096;
 
-    // ── Feature Toggles ────────────────────────────────────────────────
-    private boolean enableCodeReview = true;
+    // ── Feature Toggles ────────────────────────────────────────────
+    private boolean enableCodeReview          = true;
     private boolean enableVulnerabilityAnalysis = true;
-    private boolean enableArchitectureDrift = true;
-    private boolean enableTestGapAnalysis = true;
-    private boolean enableReleaseReadiness = true;
-    private boolean enableCommitIntelligence = true;
-    private boolean enableDependencyRisk = true;
-    private boolean enablePipelineAdvisor = true;
+    private boolean enableArchitectureDrift   = true;
+    private boolean enableTestGapAnalysis     = true;
+    private boolean enableReleaseReadiness    = true;
+    private boolean enableCommitIntelligence  = true;
+    private boolean enableDependencyRisk      = true;
+    private boolean enablePipelineAdvisor     = true;
 
-    // ── Reporting ──────────────────────────────────────────────────────
-    private boolean publishHtmlReport = true;
-    private boolean failOnCritical = false;
-    private int     criticalThreshold = 3;       // fail if score < 3/10
+    // ── Reporting ──────────────────────────────────────────────────
+    private boolean publishHtmlReport  = true;
+    private boolean failOnCritical     = false;
+    private int     criticalThreshold  = 3;
     private String  customSystemPrompt = "";
 
     public ForgeAIGlobalConfiguration() {
@@ -62,7 +53,6 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
         return GlobalConfiguration.all().get(ForgeAIGlobalConfiguration.class);
     }
 
-    // ── Persist ────────────────────────────────────────────────────────
     @Override
     public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
         req.bindJSON(this, json);
@@ -70,107 +60,36 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
         return true;
     }
 
-    // ── Resolve the API key from Jenkins Credentials store ────────────
-    public String resolveApiKey() {
-        if (apiKeyCredentialId == null || apiKeyCredentialId.isBlank()) return "";
-        StringCredentials cred = CredentialsMatchers.firstOrNull(
-                CredentialsProvider.lookupCredentialsInItemGroup(
-                        StringCredentials.class,
-                        Jenkins.get(),
-                        ACL.SYSTEM2,
-                        Collections.<DomainRequirement>emptyList()),
-                CredentialsMatchers.withId(apiKeyCredentialId));
-        return cred != null ? cred.getSecret().getPlainText() : "";
-    }
-
-    // ── Validation helpers shown in real-time in the UI ────────────────
-    @POST
-    public FormValidation doCheckLlmEndpoint(@QueryParameter String value) {
-        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-        if (value == null || value.isBlank()) return FormValidation.error("Endpoint is required");
-        if (!value.startsWith("http")) return FormValidation.error("Must start with http:// or https://");
-        return FormValidation.ok();
+    /** Returns all registered LLMProvider descriptors for the hetero-radio widget. */
+    public java.util.List<LLMProviderDescriptor> getProviderDescriptors() {
+        return LLMProvider.all();
     }
 
     @POST
-    public FormValidation doCheckModelId(@QueryParameter String value) {
+    public FormValidation doTestConnection() {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-        if (value == null || value.isBlank()) return FormValidation.error("Model ID is required");
-        return FormValidation.ok();
-    }
-
-    @POST
-    public FormValidation doTestConnection(@QueryParameter String providerType,
-                                           @QueryParameter String llmEndpoint,
-                                           @QueryParameter String modelId,
-                                           @QueryParameter String apiKeyCredentialId) {
-        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+        if (provider == null) return FormValidation.error("No provider configured.");
         try {
-            // Temporarily build a provider for the test
-            ForgeAIGlobalConfiguration temp = new ForgeAIGlobalConfiguration();
-            temp.setProviderType(providerType);
-            temp.setLlmEndpoint(llmEndpoint);
-            temp.setModelId(modelId);
-            temp.setApiKeyCredentialId(apiKeyCredentialId);
-
-            LLMProvider provider = LLMProviderFactory.create(temp);
-            if (provider.healthCheck()) {
-                return FormValidation.ok("Connection successful — %s is reachable.", provider.displayName());
-            } else {
-                return FormValidation.error("Health-check failed. Verify endpoint, API key, and model ID.");
-            }
+            return provider.healthCheck()
+                    ? FormValidation.ok("Connection successful — %s is reachable.", provider.displayName())
+                    : FormValidation.error("Health-check failed. Verify endpoint, API key, and model ID.");
         } catch (Exception e) {
             return FormValidation.error("Connection test failed: " + e.getMessage());
         }
     }
 
-    /** Populate the API-key credential dropdown. */
-    @POST
-    public ListBoxModel doFillApiKeyCredentialIdItems(@QueryParameter String apiKeyCredentialId) {
-        if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
-            return new StandardListBoxModel().includeCurrentValue(apiKeyCredentialId);
-        }
-        return new StandardListBoxModel()
-                .includeEmptyValue()
-                .includeMatchingAs(
-                        ACL.SYSTEM2,
-                        Jenkins.get(),
-                        StringCredentials.class,
-                        Collections.<DomainRequirement>emptyList(),
-                        CredentialsMatchers.always())
-                .includeCurrentValue(apiKeyCredentialId);
-    }
+    // ── Getters & Setters ──────────────────────────────────────────
 
-    /** Provider type dropdown. */
-    public ListBoxModel doFillProviderTypeItems() {
-        ListBoxModel items = new ListBoxModel();
-        items.add("OpenAI / OpenAI-Compatible (LM Studio, vLLM, LocalAI)", "openai");
-        items.add("Anthropic Claude", "anthropic");
-        items.add("Ollama (Local)", "ollama");
-        return items;
-    }
-
-    // ── Getters & Setters (DataBoundSetter for Jenkins persistence) ───
-
-    public String getProviderType() { return providerType; }
-    @DataBoundSetter public void setProviderType(String v) { this.providerType = v; }
-
-    public String getLlmEndpoint() { return llmEndpoint; }
-    @DataBoundSetter public void setLlmEndpoint(String v) { this.llmEndpoint = v; }
-
-    public String getModelId() { return modelId; }
-    @DataBoundSetter public void setModelId(String v) { this.modelId = v; }
-
-    public String getApiKeyCredentialId() { return apiKeyCredentialId; }
-    @DataBoundSetter public void setApiKeyCredentialId(String v) { this.apiKeyCredentialId = v; }
+    public LLMProvider getProvider() { return provider; }
+    @DataBoundSetter public void setProvider(LLMProvider v) { this.provider = v; }
 
     public double getTemperature() { return temperature; }
     @DataBoundSetter public void setTemperature(double v) { this.temperature = v; }
 
-    public int getTimeoutSeconds() { return timeoutSeconds; }
+    public int getTimeoutSeconds() { return timeoutSeconds > 0 ? timeoutSeconds : 120; }
     @DataBoundSetter public void setTimeoutSeconds(int v) { this.timeoutSeconds = v; }
 
-    public int getMaxTokens() { return maxTokens; }
+    public int getMaxTokens() { return maxTokens > 0 ? maxTokens : 4096; }
     @DataBoundSetter public void setMaxTokens(int v) { this.maxTokens = v; }
 
     public boolean isEnableCodeReview() { return enableCodeReview; }

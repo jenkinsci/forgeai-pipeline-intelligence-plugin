@@ -1,0 +1,23 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
+
+  <f:entry title="Endpoint" field="endpoint"
+           description="Anthropic API base URL. Default: https://api.anthropic.com/">
+    <f:textbox default="https://api.anthropic.com/"/>
+  </f:entry>
+
+  <f:entry title="Model ID" field="modelId"
+           description="E.g. claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5">
+    <f:textbox default="claude-opus-4-7"/>
+  </f:entry>
+
+  <f:entry title="API Key" field="apiKeyCredentialId"
+           description="Select a Secret Text credential containing your Anthropic API key.">
+    <c:select/>
+  </f:entry>
+
+  <f:validateButton title="Test Connection" progress="Testing..."
+                    method="testConnection"
+                    with="endpoint,modelId,apiKeyCredentialId"/>
+
+</j:jelly>
