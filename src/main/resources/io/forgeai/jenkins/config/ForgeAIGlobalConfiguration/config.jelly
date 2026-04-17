@@ -1,28 +1,14 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
 
   <f:section title="ForgeAI Pipeline Intelligence">
 
-    <!-- ── LLM Provider ──────────────────────────────────────────── -->
-    <f:entry title="LLM Provider" field="providerType">
-      <f:select/>
+    <!-- ── LLM Provider (select type + configure inline) ─────────── -->
+    <f:entry title="LLM Provider">
+      <f:hetero-radio field="provider" descriptors="${descriptor.providerDescriptors}"/>
     </f:entry>
 
-    <f:entry title="LLM Endpoint URL" field="llmEndpoint"
-             description="E.g. https://api.openai.com/ or http://localhost:11434 for Ollama">
-      <f:textbox/>
-    </f:entry>
-
-    <f:entry title="Model ID" field="modelId"
-             description="E.g. gpt-4o, claude-sonnet-4-20250514, codellama:13b">
-      <f:textbox/>
-    </f:entry>
-
-    <f:entry title="API Key" field="apiKeyCredentialId"
-             description="Select a Secret Text credential. Not needed for Ollama (local).">
-      <c:select/>
-    </f:entry>
-
+    <!-- ── Common LLM call settings ─────────────────────────────── -->
     <f:entry title="Temperature" field="temperature"
              description="0.0 = deterministic, 1.0 = creative. Recommended: 0.1 – 0.3 for code analysis.">
       <f:number clazz="setting-input" min="0" max="1" step="0.1" default="0.2"/>
@@ -35,10 +21,6 @@
     <f:entry title="Max Response Tokens" field="maxTokens">
       <f:number clazz="setting-input" min="256" default="4096"/>
     </f:entry>
-
-    <f:validateButton title="Test Connection" progress="Testing..."
-                      method="testConnection"
-                      with="providerType,llmEndpoint,modelId,apiKeyCredentialId"/>
 
     <!-- ── Analyzer Modules ──────────────────────────────────────── -->
     <f:entry title="AI Code Review" field="enableCodeReview">

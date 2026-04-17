@@ -2,83 +2,83 @@ package io.forgeai.jenkins.llm;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import hudson.Extension;
+import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
 import okhttp3.*;
+import org.jenkinsci.Symbol;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.verb.POST;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Ollama provider for air-gapped / local LLM inference.
- * Talks to the Ollama REST API at /api/generate.
  * Recommended models: codellama, deepseek-coder, mistral, llama3, phi3.
  */
-public class OllamaProvider implements LLMProvider {
+public class OllamaProvider extends LLMProvider {
 
     private static final long serialVersionUID = 1L;
     private static final String DEFAULT_ENDPOINT = "http://localhost:11434";
     private static final MediaType JSON_MEDIA = MediaType.get("application/json; charset=utf-8");
     private static final Gson GSON = new Gson();
 
-    private final String endpoint;
-    private final String model;
-    private final double temperature;
-    private final int timeoutSeconds;
-
-    public OllamaProvider(String endpoint, String model, double temperature, int timeoutSeconds) {
-        this.endpoint = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT
-                : (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint);
-        this.model = model;
-        this.temperature = temperature;
-        this.timeoutSeconds = timeoutSeconds;
+    @DataBoundConstructor
+    public OllamaProvider() {
+        this.endpoint = DEFAULT_ENDPOINT;
+        this.modelId = "codellama:13b";
     }
 
     @Override
     public String complete(String systemPrompt, String userPrompt, int maxTokens) throws LLMException {
+        ForgeAIGlobalConfiguration cfg = ForgeAIGlobalConfiguration.get();
+        int timeout = cfg.getTimeoutSeconds();
+        String ep = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT
+                : (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint);
+
         OkHttpClient client = new OkHttpClient.Builder()
-                .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
-                .readTimeout(timeoutSeconds * 3L, TimeUnit.SECONDS) // local models can be slow
+                .connectTimeout(timeout, TimeUnit.SECONDS)
+                .readTimeout(timeout * 3L, TimeUnit.SECONDS) // local models can be slow
                 .build();
 
         JsonObject options = new JsonObject();
-        options.addProperty("temperature", temperature);
+        options.addProperty("temperature", cfg.getTemperature());
         options.addProperty("num_predict", maxTokens);
 
         JsonObject body = new JsonObject();
-        body.addProperty("model", model);
+        body.addProperty("model", modelId);
         body.addProperty("system", systemPrompt);
         body.addProperty("prompt", userPrompt);
         body.addProperty("stream", false);
         body.add("options", options);
 
-        String url = endpoint + "/api/generate";
-
         Request request = new Request.Builder()
-                .url(url)
+                .url(ep + "/api/generate")
                 .post(RequestBody.create(body.toString(), JSON_MEDIA))
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
             String responseBody = response.body() != null ? response.body().string() : "";
             if (!response.isSuccessful()) {
-                throw new LLMException(
-                        "Ollama returned HTTP " + response.code() + ": " + responseBody,
+                throw new LLMException("Ollama returned HTTP " + response.code() + ": " + responseBody,
                         response.code(), displayName());
             }
-            JsonObject json = GSON.fromJson(responseBody, JsonObject.class);
-            return json.get("response").getAsString();
+            return GSON.fromJson(responseBody, JsonObject.class).get("response").getAsString();
         } catch (IOException e) {
-            throw new LLMException("Cannot reach Ollama at " + endpoint + ": " + e.getMessage(),
-                    e, displayName());
+            throw new LLMException("Cannot reach Ollama at " + ep + ": " + e.getMessage(), e, displayName());
         }
     }
 
     @Override
     public boolean healthCheck() {
+        String ep = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT
+                : (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint);
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-        try (Response r = client.newCall(new Request.Builder().url(endpoint + "/api/tags").build()).execute()) {
+        try (Response r = client.newCall(new Request.Builder().url(ep + "/api/tags").build()).execute()) {
             return r.isSuccessful();
         } catch (IOException e) {
             return false;
@@ -86,7 +86,27 @@ public class OllamaProvider implements LLMProvider {
     }
 
     @Override
-    public String displayName() {
-        return "Ollama Local (" + model + ")";
+    public String displayName() { return "Ollama Local (" + modelId + ")"; }
+
+    @Extension
+    @Symbol("ollama")
+    public static class DescriptorImpl extends LLMProviderDescriptor {
+
+        @Override
+        public String getDisplayName() { return "Ollama (Local)"; }
+
+        @POST
+        public hudson.util.FormValidation doTestConnection(@QueryParameter String endpoint) {
+            jenkins.model.Jenkins.get().checkPermission(jenkins.model.Jenkins.ADMINISTER);
+            try {
+                OllamaProvider p = new OllamaProvider();
+                p.setEndpoint(endpoint);
+                return p.healthCheck()
+                        ? hudson.util.FormValidation.ok("Ollama is reachable.")
+                        : hudson.util.FormValidation.error("Cannot reach Ollama. Is it running?");
+            } catch (Exception e) {
+                return hudson.util.FormValidation.error("Connection test failed: " + e.getMessage());
+            }
+        }
     }
 }
