@@ -1,12 +1,13 @@
 package io.forgeai.jenkins.llm;
 
+import hudson.ExtensionPoint;
 import java.io.Serializable;
 
 /**
  * Abstraction over any LLM backend.
  * Implementations: OpenAI, Anthropic Claude, Ollama (local), LM Studio, Custom HTTP endpoint.
  */
-public interface LLMProvider extends Serializable {
+public interface LLMProvider extends ExtensionPoint, Serializable {
 
     /**
      * Send a prompt to the LLM and receive a text completion.

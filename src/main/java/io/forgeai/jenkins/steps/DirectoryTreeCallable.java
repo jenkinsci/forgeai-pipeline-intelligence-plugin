@@ -1,7 +1,7 @@
 package io.forgeai.jenkins.steps;
 
 import hudson.remoting.VirtualChannel;
-import jenkins.MasterToSlaveFileCallable;
+import jenkins.ControllerToAgentFileCallable;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 /**
  * Runs on the agent node to list the top-level workspace structure.
  */
-public class DirectoryTreeCallable extends MasterToSlaveFileCallable<String> {
+public class DirectoryTreeCallable implements ControllerToAgentFileCallable<String> {
     private static final long serialVersionUID = 1L;
 
     @Override

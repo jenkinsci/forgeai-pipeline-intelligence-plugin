@@ -1,14 +1,7 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
 
-  <f:section title="🔥 ForgeAI Pipeline Intelligence">
-
-    <f:description>
-      <div style="padding:10px;background:#1e293b;border-radius:8px;color:#e2e8f0;margin-bottom:12px">
-        <strong>ForgeAI</strong> — AI-Powered Pipeline Intelligence.<br/>
-        Configure your LLM provider, enable/disable analyzers, and set quality gates.
-      </div>
-    </f:description>
+  <f:section title="ForgeAI Pipeline Intelligence">
 
     <!-- ── LLM Provider ──────────────────────────────────────────── -->
     <f:entry title="LLM Provider" field="providerType">
@@ -21,7 +14,7 @@
     </f:entry>
 
     <f:entry title="Model ID" field="modelId"
-             description="E.g. gpt-4o, claude-sonnet-4-20250514, codellama:13b, deepseek-coder:33b">
+             description="E.g. gpt-4o, claude-sonnet-4-20250514, codellama:13b">
       <f:textbox/>
     </f:entry>
 
@@ -32,74 +25,66 @@
 
     <f:entry title="Temperature" field="temperature"
              description="0.0 = deterministic, 1.0 = creative. Recommended: 0.1 – 0.3 for code analysis.">
-      <f:textbox default="0.2"/>
+      <f:number clazz="setting-input" min="0" max="1" step="0.1" default="0.2"/>
     </f:entry>
 
     <f:entry title="Timeout (seconds)" field="timeoutSeconds">
-      <f:textbox default="120"/>
+      <f:number clazz="setting-input" min="10" default="120"/>
     </f:entry>
 
     <f:entry title="Max Response Tokens" field="maxTokens">
-      <f:textbox default="4096"/>
+      <f:number clazz="setting-input" min="256" default="4096"/>
     </f:entry>
 
     <f:validateButton title="Test Connection" progress="Testing..."
                       method="testConnection"
                       with="providerType,llmEndpoint,modelId,apiKeyCredentialId"/>
 
-    <!-- ── Feature Toggles ───────────────────────────────────────── -->
-    <f:section title="Analyzer Modules">
-
-      <f:entry title="AI Code Review" field="enableCodeReview">
-        <f:checkbox default="true"/>
-      </f:entry>
-      <f:entry title="Vulnerability Analysis" field="enableVulnerabilityAnalysis">
-        <f:checkbox default="true"/>
-      </f:entry>
-      <f:entry title="Architecture Drift Detection" field="enableArchitectureDrift">
-        <f:checkbox default="true"/>
-      </f:entry>
-      <f:entry title="Test Gap Analysis" field="enableTestGapAnalysis">
-        <f:checkbox default="true"/>
-      </f:entry>
-      <f:entry title="Dependency Risk Scoring" field="enableDependencyRisk">
-        <f:checkbox default="true"/>
-      </f:entry>
-      <f:entry title="Commit Intelligence" field="enableCommitIntelligence">
-        <f:checkbox default="true"/>
-      </f:entry>
-      <f:entry title="Pipeline Optimization Advisor" field="enablePipelineAdvisor">
-        <f:checkbox default="true"/>
-      </f:entry>
-      <f:entry title="Release Readiness Score" field="enableReleaseReadiness">
-        <f:checkbox default="true"/>
-      </f:entry>
-
-    </f:section>
+    <!-- ── Analyzer Modules ──────────────────────────────────────── -->
+    <f:entry title="AI Code Review" field="enableCodeReview">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Vulnerability Analysis" field="enableVulnerabilityAnalysis">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Architecture Drift Detection" field="enableArchitectureDrift">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Test Gap Analysis" field="enableTestGapAnalysis">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Dependency Risk Scoring" field="enableDependencyRisk">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Commit Intelligence" field="enableCommitIntelligence">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Pipeline Optimization Advisor" field="enablePipelineAdvisor">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Release Readiness Score" field="enableReleaseReadiness">
+      <f:checkbox default="true"/>
+    </f:entry>
 
     <!-- ── Quality Gate ──────────────────────────────────────────── -->
-    <f:section title="Quality Gate &amp; Reporting">
+    <f:entry title="Publish HTML Report" field="publishHtmlReport">
+      <f:checkbox default="true"/>
+    </f:entry>
 
-      <f:entry title="Publish HTML Report" field="publishHtmlReport">
-        <f:checkbox default="true"/>
-      </f:entry>
+    <f:entry title="Fail Build on Low Score" field="failOnCritical"
+             description="Fail the build when composite score falls below the threshold.">
+      <f:checkbox default="false"/>
+    </f:entry>
 
-      <f:entry title="Fail Build on Low Score" field="failOnCritical"
-               description="Fail the build when composite score falls below the threshold.">
-        <f:checkbox default="false"/>
-      </f:entry>
+    <f:entry title="Score Threshold (1-10)" field="criticalThreshold"
+             description="Minimum composite score to pass the quality gate.">
+      <f:number clazz="setting-input" min="1" max="10" default="3"/>
+    </f:entry>
 
-      <f:entry title="Score Threshold (1-10)" field="criticalThreshold"
-               description="Minimum composite score to pass the quality gate.">
-        <f:textbox default="3"/>
-      </f:entry>
-
-      <f:entry title="Custom System Prompt (Advanced)" field="customSystemPrompt"
-               description="Optional: prepend custom instructions to all analyzer prompts.">
-        <f:textarea/>
-      </f:entry>
-
-    </f:section>
+    <f:entry title="Custom System Prompt (Advanced)" field="customSystemPrompt"
+             description="Optional: prepend custom instructions to all analyzer prompts.">
+      <f:textarea/>
+    </f:entry>
 
   </f:section>
 

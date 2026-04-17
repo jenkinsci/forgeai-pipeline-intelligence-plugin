@@ -150,8 +150,8 @@ public class ForgeAIStep extends Step {
 
             // ── Generate HTML Report ──
             if (cfg.isPublishHtmlReport() && !results.isEmpty()) {
-                String projectName = env.getOrDefault("JOB_NAME", "unknown");
-                String buildNum = env.getOrDefault("BUILD_NUMBER", "0");
+                String projectName = build.getParent().getFullName();
+                String buildNum = String.valueOf(build.getNumber());
                 String html = ForgeAIReportGenerator.generateHtml(results, projectName, buildNum);
 
                 FilePath reportDir = new FilePath(workspace, "forgeai-reports");
