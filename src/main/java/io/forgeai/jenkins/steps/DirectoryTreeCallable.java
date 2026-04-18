@@ -1,7 +1,7 @@
 package io.forgeai.jenkins.steps;
 
 import hudson.remoting.VirtualChannel;
-import jenkins.ControllerToAgentFileCallable;
+import jenkins.agents.ControllerToAgentFileCallable;
 
 import java.io.File;
 import java.io.IOException;
