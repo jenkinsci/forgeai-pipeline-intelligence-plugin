@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Jenkins Plugin](https://img.shields.io/badge/Jenkins-2.426.3%2B-blue.svg)](https://www.jenkins.io/)
+[![Jenkins Plugin](https://img.shields.io/badge/Jenkins-2.528.3%2B-blue.svg)](https://www.jenkins.io/)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://adoptium.net)
 
 ---
@@ -365,7 +365,7 @@ forgeai-pipeline-intelligence/
 
 | Requirement | Minimum |
 |---|---|
-| Jenkins | 2.426.3 LTS |
+| Jenkins | 2.528.3 LTS |
 | Java (runtime) | 17 |
 | Java (build) | 17 (tested through 21) |
 | Maven (build) | 3.9 |

@@ -9,7 +9,7 @@ import hudson.model.TaskListener;
 import io.forgeai.jenkins.analyzers.*;
 import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
 import io.forgeai.jenkins.llm.LLMProvider;
-import io.forgeai.jenkins.llm.LLMProviderFactory;
+
 import io.forgeai.jenkins.reports.AnalysisResult;
 import io.forgeai.jenkins.reports.ForgeAIReportGenerator;
 import org.jenkinsci.plugins.workflow.steps.*;
@@ -87,7 +87,7 @@ public class ForgeAIStep extends Step {
             PrintStream log = listener.getLogger();
 
             ForgeAIGlobalConfiguration cfg = ForgeAIGlobalConfiguration.get();
-            LLMProvider llm = LLMProviderFactory.create(cfg);
+            LLMProvider llm = cfg.getProvider();
             int maxTokens = cfg.getMaxTokens();
 
             log.println("╔══════════════════════════════════════════════════╗");
