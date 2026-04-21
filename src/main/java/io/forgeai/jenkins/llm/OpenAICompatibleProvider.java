@@ -87,7 +87,8 @@ public class OpenAICompatibleProvider extends LLMProvider {
     @Override
     public boolean healthCheck() {
         try {
-            return complete("You are a health-check bot.", "Reply OK", 10) != null;
+            complete("You are a health-check bot.", "Reply OK", 10);
+            return true;
         } catch (LLMException e) {
             return false;
         }

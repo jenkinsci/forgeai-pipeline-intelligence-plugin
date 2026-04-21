@@ -2,18 +2,18 @@ package io.forgeai.jenkins;
 
 import io.forgeai.jenkins.analyzers.ResultParser;
 import io.forgeai.jenkins.reports.AnalysisResult;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.PrintStream;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class ForgeAIPluginTest {
+class ForgeAIPluginTest {
 
     private final PrintStream log = System.out;
 
     @Test
-    public void testResultParser_validJson() {
+    void testResultParser_validJson() {
         String json = """
                 {
                   "score": 7,
@@ -40,7 +40,7 @@ public class ForgeAIPluginTest {
     }
 
     @Test
-    public void testResultParser_markdownWrapped() {
+    void testResultParser_markdownWrapped() {
         String json = """
                 ```json
                 {"score":9,"severity":"LOW","summary":"All good.","findings":[]}
@@ -52,15 +52,15 @@ public class ForgeAIPluginTest {
     }
 
     @Test
-    public void testResultParser_malformedJson() {
+    void testResultParser_malformedJson() {
         String garbage = "This is not JSON at all.";
         AnalysisResult result = ResultParser.parse(garbage, "test", "Test", log);
-        assertEquals(5, result.getScore()); // default fallback
+        assertEquals(5, result.getScore());
         assertNotNull(result.getRawMarkdown());
     }
 
     @Test
-    public void testResultParser_extraTextBeforeJson() {
+    void testResultParser_extraTextBeforeJson() {
         String response = "Sure! Here is the analysis:\n{\"score\":4,\"severity\":\"HIGH\"," +
                 "\"summary\":\"Issues found.\",\"findings\":[]}";
         AnalysisResult result = ResultParser.parse(response, "vuln", "Vuln", log);
@@ -69,7 +69,7 @@ public class ForgeAIPluginTest {
     }
 
     @Test
-    public void testAnalysisResult_countBySeverity() {
+    void testAnalysisResult_countBySeverity() {
         AnalysisResult r = new AnalysisResult("test", "Test");
         r.addFinding(new AnalysisResult.Finding("A", "CRITICAL", "desc"));
         r.addFinding(new AnalysisResult.Finding("B", "CRITICAL", "desc"));
@@ -82,7 +82,7 @@ public class ForgeAIPluginTest {
     }
 
     @Test
-    public void testAnalysisResult_scoreClamp() {
+    void testAnalysisResult_scoreClamp() {
         AnalysisResult r = new AnalysisResult("test", "Test");
         r.setScore(15);
         assertEquals(10, r.getScore());
