@@ -1,5 +1,6 @@
 package io.forgeai.jenkins.reports;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -12,6 +13,8 @@ public final class ForgeAIReportGenerator {
 
     private ForgeAIReportGenerator() {}
 
+    @SuppressFBWarnings(value = "VA_FORMAT_STRING_USES_NEWLINE",
+            justification = "HTML output intentionally uses \\n, not platform-dependent %n")
     public static String generateHtml(List<AnalysisResult> results, String projectName,
                                        String buildNumber) {
         StringBuilder html = new StringBuilder();
