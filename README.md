@@ -2,7 +2,7 @@
 
 ### AI-Powered Code Reviews, Security Analysis, Architecture Drift Detection & Release Readiness — Directly in Your Jenkins Pipeline
 
-[![CI](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/actions/workflows/ci.yml)
+[![CI](https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Jenkins Plugin](https://img.shields.io/badge/Jenkins-2.528.3%2B-blue.svg)](https://www.jenkins.io/)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://adoptium.net)
@@ -80,8 +80,8 @@ ForgeAI is **provider-agnostic**. Use whatever fits your security and budget req
 **Build from source:**
 
 ```bash
-git clone https://github.com/forgeai-oss/forgeai-pipeline-intelligence.git
-cd forgeai-pipeline-intelligence
+git clone https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin.git
+cd forgeai-pipeline-intelligence-plugin
 mvn clean package -DskipTests
 ```
 
@@ -273,8 +273,8 @@ The report is written to `forgeai-reports/forgeai-report.html` in the workspace.
 **Prerequisites:** JDK 17+, Maven 3.9+
 
 ```bash
-git clone https://github.com/forgeai-oss/forgeai-pipeline-intelligence.git
-cd forgeai-pipeline-intelligence
+git clone https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin.git
+cd forgeai-pipeline-intelligence-plugin
 
 # Full build with tests
 mvn clean verify
@@ -406,6 +406,6 @@ Key areas where help is particularly valuable:
 
 <div align="center">
 
-[Report a Bug](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/issues/new?template=bug_report.md) · [Request a Feature](https://github.com/forgeai-oss/forgeai-pipeline-intelligence/issues/new?template=feature_request.md) · [Contribute](CONTRIBUTING.md)
+[Report a Bug](https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin/issues/new?template=bug_report.md) · [Request a Feature](https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin/issues/new?template=feature_request.md) · [Contribute](CONTRIBUTING.md)
 
 </div>
