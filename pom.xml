@@ -22,7 +22,7 @@
         Architecture Drift Detection, Test Gap Analysis, Release Readiness Scoring, and more.
         Supports OpenAI, Anthropic Claude, Ollama (local), LM Studio, and custom LLM endpoints.
     </description>
-    <url>https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin</url>
+    <url>https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin/blob/main/docs/index.adoc</url>
 
     <licenses>
         <license>

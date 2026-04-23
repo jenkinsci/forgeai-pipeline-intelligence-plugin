@@ -1,0 +1,374 @@
+= ForgeAI Pipeline Intelligence
+:toc: macro
+:toc-title: Contents
+:toclevels: 2
+:sectanchors:
+:source-highlighter: rouge
+
+AI-powered code reviews, vulnerability analysis, architecture drift detection, test gap analysis, and release readiness scoring — directly in your Jenkins pipeline.
+Supports OpenAI, Anthropic Claude, Ollama (local), LM Studio, vLLM, and any OpenAI-compatible endpoint.
+
+toc::[]
+
+== Why ForgeAI?
+
+Every CI/CD pipeline runs linters and tests — but they miss the *architectural*, *strategic*, and *contextual* issues that only experienced engineers catch.
+ForgeAI bridges that gap by embedding AI-powered intelligence directly into your Jenkins pipeline.
+
+* *8 specialized analyzers*, each with expert-level system prompts tuned for its domain
+* *Architecture-aware analysis* that understands hexagonal, layered, CQRS, and microservice patterns
+* *Composite scoring* that weighs security 3× and architecture 2× — because not all findings are equal
+* *Release readiness verdicts* (SHIP_IT / CAUTION / HOLD / BLOCK) that synthesize all analyses
+* *Zero-cloud mode* via Ollama for air-gapped and regulated environments
+* *A self-contained HTML report* archived with every build
+
+== Analyzers
+
+[cols="2,1,3",options="header"]
+|===
+|Analyzer |ID |What It Does
+
+|AI Code Review
+|`code-review`
+|SOLID, DRY, naming, error handling, anti-patterns, readability
+
+|Vulnerability Analysis
+|`vulnerability`
+|OWASP Top 10, hardcoded secrets, injection, CWE mapping
+
+|Architecture Drift Detection
+|`architecture-drift`
+|Layer violations, circular deps, coupling, pattern enforcement
+
+|Test Gap Analysis
+|`test-gaps`
+|Untested paths, missing edge cases, test quality, concrete suggestions
+
+|Dependency Risk Scoring
+|`dependency-risk`
+|License conflicts, unmaintained deps, unpinned versions, duplication
+
+|Commit Intelligence
+|`commit-intel`
+|Commit hygiene, breaking change detection, changelog & semver suggestions
+
+|Pipeline Optimizer
+|`pipeline-advisor`
+|Parallelization, caching, resource waste, failure resilience
+
+|Release Readiness
+|`release-readiness`
+|Composite verdict synthesizing all prior analyses
+|===
+
+== Supported LLM Backends
+
+ForgeAI is *provider-agnostic*. Use whatever fits your security and budget requirements:
+
+[cols="2,1,1,1",options="header"]
+|===
+|Provider |Type |API Key Required |Air-Gapped
+
+|OpenAI (GPT-4o, GPT-4o-mini, o1)
+|Cloud API
+|Yes
+|No
+
+|Anthropic Claude (claude-opus-4-7, claude-sonnet-4-6)
+|Cloud API
+|Yes
+|No
+
+|Ollama (DeepSeek-Coder, CodeLlama, Llama 3, Mistral, Phi-3)
+|Local
+|No
+|*Yes*
+
+|LM Studio
+|Local
+|No
+|*Yes*
+
+|vLLM / LocalAI / text-generation-webui
+|Self-hosted
+|Optional
+|*Yes*
+
+|Any OpenAI-compatible endpoint
+|Varies
+|Varies
+|Varies
+|===
+
+== Installation
+
+=== From the Jenkins Update Center
+
+. Go to *Manage Jenkins → Plugins → Available plugins*
+. Search for *ForgeAI Pipeline Intelligence*
+. Install and restart Jenkins
+
+=== Manual Installation
+
+[source,bash]
+----
+git clone https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin.git
+cd forgeai-pipeline-intelligence-plugin
+mvn clean package -DskipTests
+----
+
+Upload `target/forgeai-pipeline-intelligence.hpi` via *Manage Jenkins → Plugins → Advanced → Deploy Plugin*.
+
+== Configuration
+
+Navigate to *Manage Jenkins → System → ForgeAI Pipeline Intelligence*:
+
+. Select your *LLM Provider* (OpenAI / Anthropic / Ollama)
+. Enter the *Endpoint URL* (e.g., `https://api.openai.com/`)
+. Enter the *Model ID* (e.g., `gpt-4o`)
+. Select or create an *API Key credential* (Jenkins Secret Text)
+. Click *Test Connection* to verify
+. Enable or disable individual analyzers
+. Save
+
+=== Global Settings Reference
+
+[cols="2,3,1",options="header"]
+|===
+|Setting |Description |Default
+
+|LLM Provider
+|OpenAI / Anthropic / Ollama
+|OpenAI
+
+|Endpoint URL
+|API base URL
+|`https://api.openai.com/`
+
+|Model ID
+|Model to use
+|`gpt-4o`
+
+|API Key Credential
+|Jenkins Secret Text credential ID
+|—
+
+|Temperature
+|LLM creativity (0.0–1.0)
+|`0.2`
+
+|Timeout
+|Request timeout in seconds
+|`120`
+
+|Max Tokens
+|Maximum response length
+|`4096`
+
+|Per-analyzer toggles
+|Enable or disable each analyzer globally
+|All enabled
+
+|Publish HTML Report
+|Generate the HTML report artifact
+|`true`
+
+|Fail on Low Score
+|Fail build below the threshold
+|`false`
+
+|Score Threshold
+|Minimum passing composite score (1–10)
+|`3`
+
+|Custom System Prompt
+|Text prepended to every LLM prompt
+|—
+|===
+
+== Pipeline DSL Reference
+
+=== `forgeAI` — Full Analysis Step
+
+Runs multiple analyzers in sequence and produces a composite report.
+
+[source,groovy]
+----
+stage('ForgeAI Intelligence') {
+    steps {
+        script {
+            def report = forgeAI(
+                analyzers: ['code-review', 'vulnerability', 'architecture-drift',
+                            'test-gaps', 'dependency-risk', 'release-readiness'],
+                sourceGlob: 'src/**/*.java',
+                contextInfo: 'Spring Boot microservice, hexagonal architecture',
+                failOnCritical: true,
+                criticalThreshold: 4
+            )
+            echo "Composite Score: ${report.compositeScore}/10"
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'forgeai-reports/**', allowEmptyArchive: true
+            publishHTML(target: [
+                reportDir: 'forgeai-reports',
+                reportFiles: 'forgeai-report.html',
+                reportName: 'ForgeAI Report'
+            ])
+        }
+    }
+}
+----
+
+==== Parameters
+
+[cols="2,1,1,3",options="header"]
+|===
+|Parameter |Type |Default |Description
+
+|`analyzers`
+|`List<String>`
+|All 7 analyzers
+|Which analyzers to run
+
+|`sourceGlob`
+|`String`
+|`**/*.java,**/*.py,**/*.js,**/*.ts,**/*.go,**/*.rs`
+|Glob patterns for source files
+
+|`contextInfo`
+|`String`
+|`""`
+|Project description, architecture, or constraints
+
+|`failOnCritical`
+|`boolean`
+|`false`
+|Fail build if composite score falls below threshold
+
+|`criticalThreshold`
+|`int`
+|`3`
+|Minimum composite score (1–10)
+|===
+
+*Returns* a `Map` with: `compositeScore`, `totalFindings`, `criticalCount`, `analyzerCount`, and per-analyzer scores (e.g., `code-reviewScore`, `vulnerabilityScore`).
+
+=== `forgeAIScan` — Single Analyzer Step
+
+Runs one analyzer against provided source code.
+
+[source,groovy]
+----
+def result = forgeAIScan(
+    analyzer: 'vulnerability',
+    source: readFile('src/main/java/App.java'),
+    context: 'Java 17 REST API handling PII data'
+)
+if (result.criticalCount > 0) {
+    error("Security scan found ${result.criticalCount} critical vulnerabilities")
+}
+----
+
+==== Parameters
+
+[cols="1,1,3",options="header"]
+|===
+|Parameter |Type |Description
+
+|`analyzer`
+|`String`
+|Analyzer ID (see table above)
+
+|`source`
+|`String`
+|Source code or diff to analyze
+
+|`context`
+|`String`
+|Additional context
+|===
+
+*Returns* a `Map` with: `score`, `severity`, `summary`, `findingsCount`, `criticalCount`, `highCount`.
+
+=== Parallel Analyzers
+
+[source,groovy]
+----
+stage('ForgeAI Parallel') {
+    parallel {
+        stage('Security')     { steps { script { forgeAIScan analyzer: 'vulnerability',      source: src } } }
+        stage('Architecture') { steps { script { forgeAIScan analyzer: 'architecture-drift', source: src } } }
+        stage('Test Gaps')    { steps { script { forgeAIScan analyzer: 'test-gaps',          source: src } } }
+    }
+}
+----
+
+== Air-Gapped / Local LLM Setup
+
+ForgeAI supports fully offline operation — no data ever leaves your network.
+
+=== Ollama
+
+[source,bash]
+----
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a code-focused model
+ollama pull deepseek-coder:6.7b   # Fast, good for most use cases (~4 GB)
+ollama pull codellama:13b         # Meta's code model
+
+# Verify it is running
+curl http://localhost:11434/api/tags
+----
+
+Jenkins global config:
+
+----
+Provider:  Ollama (Local)
+Endpoint:  http://localhost:11434
+Model ID:  deepseek-coder:6.7b
+API Key:   (leave blank)
+----
+
+=== LM Studio
+
+. Download from https://lmstudio.ai[lmstudio.ai]
+. Load any GGUF model (e.g., `deepseek-coder-v2`)
+. Start the local server (default: `http://localhost:1234`)
+. In Jenkins, select *OpenAI / OpenAI-Compatible*, set endpoint to `http://localhost:1234/`, and leave API Key blank
+
+== HTML Report
+
+Every build generates a self-contained HTML report with:
+
+* *Composite score* and *release verdict* (SHIP_IT / CAUTION / HOLD / BLOCK)
+* *Per-analyzer breakdown* with individual scores
+* *Detailed findings* with severity, file location, and suggested fixes
+* *Dark theme* optimised for readability
+
+The report is written to `forgeai-reports/forgeai-report.html` in the workspace.
+Use the https://plugins.jenkins.io/htmlpublisher/[HTML Publisher plugin] or `archiveArtifacts` to surface it on the build page.
+
+== Requirements
+
+[cols="1,1",options="header"]
+|===
+|Requirement |Minimum
+
+|Jenkins
+|2.528.3 LTS
+
+|Java (runtime)
+|17
+
+|LLM
+|OpenAI API key, Anthropic API key, or Ollama running locally
+|===
+
+== Issues and Contributing
+
+* Report bugs and request features on the https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin/issues[GitHub issue tracker]
+* See https://github.com/jenkinsci/forgeai-pipeline-intelligence-plugin/blob/main/CONTRIBUTING.md[CONTRIBUTING.md] for pull request guidelines
