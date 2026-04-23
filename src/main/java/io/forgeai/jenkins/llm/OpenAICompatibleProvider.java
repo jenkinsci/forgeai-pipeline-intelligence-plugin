@@ -3,6 +3,7 @@ package io.forgeai.jenkins.llm;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.Extension;
 import hudson.util.Secret;
 import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
@@ -33,6 +34,8 @@ public class OpenAICompatibleProvider extends LLMProvider {
     }
 
     @Override
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
+            justification = "OkHttp Response.body() is @Nullable per its contract; null check is necessary")
     public String complete(String systemPrompt, String userPrompt, int maxTokens) throws LLMException {
         ForgeAIGlobalConfiguration cfg = ForgeAIGlobalConfiguration.get();
         Secret apiKey = Secret.fromString(resolveApiKey());
@@ -71,7 +74,8 @@ public class OpenAICompatibleProvider extends LLMProvider {
         }
 
         try (Response response = client.newCall(reqBuilder.build()).execute()) {
-            String responseBody = response.body() != null ? response.body().string() : "";
+            ResponseBody rb = response.body();
+            String responseBody = rb != null ? rb.string() : "";
             if (!response.isSuccessful()) {
                 throw new LLMException("API returned HTTP " + response.code() + ": " + responseBody,
                         response.code(), displayName());

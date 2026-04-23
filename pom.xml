@@ -45,6 +45,7 @@
         <hpi.strictBundledArtifacts>true</hpi.strictBundledArtifacts>
         <ban-commons-lang-2.skip>false</ban-commons-lang-2.skip>
         <ban-deprecated-stapler.skip>false</ban-deprecated-stapler.skip>
+        <ban-junit4-imports.skip>false</ban-junit4-imports.skip>
         <gitHubRepo>jenkinsci/forgeai-pipeline-intelligence-plugin</gitHubRepo>
     </properties>
 
@@ -102,12 +103,6 @@
             <artifactId>gson-api</artifactId>
         </dependency>
 
-        <!-- Test Dependencies -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <repositories>
