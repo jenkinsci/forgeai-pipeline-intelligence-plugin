@@ -1,5 +1,6 @@
 package io.forgeai.jenkins.analyzers;
 
+import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
 import io.forgeai.jenkins.llm.LLMException;
 import io.forgeai.jenkins.llm.LLMProvider;
 import io.forgeai.jenkins.reports.AnalysisResult;
@@ -40,7 +41,12 @@ public abstract class BaseAnalyzer {
     protected String safeComplete(String systemPrompt, String userPrompt) throws LLMException {
         logger.println("[ForgeAI/" + analyzerId() + "] Sending analysis request to LLM...");
         long start = System.currentTimeMillis();
-        String result = llm.complete(systemPrompt, userPrompt, maxTokens);
+        ForgeAIGlobalConfiguration cfg = ForgeAIGlobalConfiguration.get();
+        String custom = (cfg != null) ? cfg.getCustomSystemPrompt() : null;
+        String effectivePrompt = (custom != null && !custom.isBlank())
+                ? custom + "\n\n" + systemPrompt
+                : systemPrompt;
+        String result = llm.complete(effectivePrompt, userPrompt, maxTokens);
         long elapsed = System.currentTimeMillis() - start;
         logger.printf("[ForgeAI/%s] LLM responded in %.1f seconds%n", analyzerId(), elapsed / 1000.0);
         return result;

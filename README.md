@@ -87,7 +87,7 @@ mvn clean package -DskipTests
 
 Upload `target/forgeai-pipeline-intelligence.hpi` via **Manage Jenkins → Plugins → Advanced → Deploy Plugin**.
 
-**From the Jenkins Update Center** (once published):
+**From the Jenkins Update Center:**
 
 Manage Jenkins → Plugins → Available → search for "ForgeAI Pipeline Intelligence"
 

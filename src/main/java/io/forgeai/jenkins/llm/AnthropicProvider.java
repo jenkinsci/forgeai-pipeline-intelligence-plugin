@@ -23,6 +23,7 @@ public class AnthropicProvider extends LLMProvider {
     private static final String API_VERSION = "2023-06-01";
     private static final MediaType JSON_MEDIA = MediaType.get("application/json; charset=utf-8");
     private static final Gson GSON = new Gson();
+    private static final int MAX_RETRIES = 2;
 
     @DataBoundConstructor
     public AnthropicProvider() {
@@ -65,26 +66,48 @@ public class AnthropicProvider extends LLMProvider {
                 .addHeader("anthropic-version", API_VERSION)
                 .build();
 
-        try (Response response = client.newCall(request).execute()) {
-            ResponseBody rb = response.body();
-            String responseBody = rb != null ? rb.string() : "";
-            if (!response.isSuccessful()) {
-                throw new LLMException("Anthropic API returned HTTP " + response.code() + ": " + responseBody,
-                        response.code(), displayName());
-            }
-            JsonObject json = GSON.fromJson(responseBody, JsonObject.class);
-            JsonArray content = json.getAsJsonArray("content");
-            StringBuilder sb = new StringBuilder();
-            for (var el : content) {
-                JsonObject block = el.getAsJsonObject();
-                if ("text".equals(block.get("type").getAsString())) {
-                    sb.append(block.get("text").getAsString());
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try (Response response = client.newCall(request).execute()) {
+                ResponseBody rb = response.body();
+                String responseBody = rb != null ? rb.string() : "";
+                int code = response.code();
+                // Anthropic uses 529 for overloaded in addition to standard 5xx
+                if (code == 429 || code == 529 || (code >= 500 && code <= 599)) {
+                    if (attempt == MAX_RETRIES) {
+                        throw new LLMException("Anthropic API returned HTTP " + code + " after " + (MAX_RETRIES + 1) + " attempts: " + responseBody, code, displayName());
+                    }
+                    long waitMs = retryWaitMillis(response.header("Retry-After"), attempt);
+                    try { Thread.sleep(waitMs); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new LLMException("Interrupted during retry backoff", ie, displayName());
+                    }
+                    continue;
                 }
+                if (!response.isSuccessful()) {
+                    throw new LLMException("Anthropic API returned HTTP " + code + ": " + responseBody, code, displayName());
+                }
+                JsonObject json = GSON.fromJson(responseBody, JsonObject.class);
+                JsonArray content = json.getAsJsonArray("content");
+                StringBuilder sb = new StringBuilder();
+                for (var el : content) {
+                    JsonObject block = el.getAsJsonObject();
+                    if ("text".equals(block.get("type").getAsString())) {
+                        sb.append(block.get("text").getAsString());
+                    }
+                }
+                return sb.toString();
+            } catch (IOException e) {
+                throw new LLMException("Network error: " + e.getMessage(), e, displayName());
             }
-            return sb.toString();
-        } catch (IOException e) {
-            throw new LLMException("Network error: " + e.getMessage(), e, displayName());
         }
+        throw new LLMException("Retry exhausted without result", 0, displayName());
+    }
+
+    private static long retryWaitMillis(String retryAfterHeader, int attempt) {
+        if (retryAfterHeader != null) {
+            try { return Long.parseLong(retryAfterHeader) * 1000L; } catch (NumberFormatException ignored) {}
+        }
+        return (1L << attempt) * 1000L; // 1s, 2s
     }
 
     @Override
