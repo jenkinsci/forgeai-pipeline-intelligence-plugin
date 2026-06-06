@@ -50,7 +50,7 @@ jobs:
     needs: build
     strategy:
       matrix:
-        jenkins-version: ['2.426.3', '2.440.1', '2.462.1']
+        jenkins-version: ['2.528.3']
 
     steps:
       - uses: actions/checkout@v4
