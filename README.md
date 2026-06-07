@@ -77,6 +77,10 @@ ForgeAI is **provider-agnostic**. Use whatever fits your security and budget req
 
 ### 1. Install the Plugin
 
+**From the Jenkins Update Center (recommended):**
+
+Manage Jenkins → Plugins → Available Plugins → search **"ForgeAI Pipeline Intelligence"** → Install
+
 **Build from source:**
 
 ```bash
@@ -86,10 +90,6 @@ mvn clean package -DskipTests
 ```
 
 Upload `target/forgeai-pipeline-intelligence.hpi` via **Manage Jenkins → Plugins → Advanced → Deploy Plugin**.
-
-**From the Jenkins Update Center:**
-
-Manage Jenkins → Plugins → Available → search for "ForgeAI Pipeline Intelligence"
 
 ### 2. Configure the LLM Provider
 
