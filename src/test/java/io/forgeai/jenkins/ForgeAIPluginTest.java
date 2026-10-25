@@ -2,9 +2,11 @@ package io.forgeai.jenkins;
 
 import io.forgeai.jenkins.analyzers.ResultParser;
 import io.forgeai.jenkins.reports.AnalysisResult;
+import io.forgeai.jenkins.reports.ForgeAIReportGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.io.PrintStream;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -79,6 +81,34 @@ class ForgeAIPluginTest {
         assertEquals(2, r.countBySeverity("CRITICAL"));
         assertEquals(1, r.countBySeverity("HIGH"));
         assertEquals(0, r.countBySeverity("MEDIUM"));
+    }
+
+    @Test
+    void testResultParser_flagsParseFailure() {
+        assertTrue(ResultParser.parse("not json", "t", "T", log).isParseFailed());
+        assertFalse(ResultParser.parse("{\"score\":8,\"findings\":[]}", "t", "T", log).isParseFailed());
+    }
+
+    @Test
+    void testResultParser_normalizesSeverity() {
+        String json = "{\"score\":3,\"severity\":\"critical\",\"findings\":["
+                + "{\"title\":\"x\",\"severity\":\"\\\"><script>alert(1)</script>\"}]}";
+        AnalysisResult result = ResultParser.parse(json, "t", "T", log);
+        assertEquals("CRITICAL", result.getSeverity());
+        assertEquals("MEDIUM", result.getFindings().get(0).getSeverity());
+    }
+
+    @Test
+    void testReportGenerator_escapesLlmControlledFields() {
+        AnalysisResult r = new AnalysisResult("t", "T");
+        r.setScore(5);
+        r.setSummary("<b>summary</b>");
+        r.addFinding(new AnalysisResult.Finding("<img src=x onerror=alert(1)>",
+                "\"><script>alert(1)</script>", "desc"));
+        String html = ForgeAIReportGenerator.generateHtml(List.of(r), "folder/job", "1");
+        assertFalse(html.contains("<script>"), "severity must be escaped");
+        assertFalse(html.contains("<img"), "title must be escaped");
+        assertFalse(html.contains("<b>summary"), "summary must be escaped");
     }
 
     @Test

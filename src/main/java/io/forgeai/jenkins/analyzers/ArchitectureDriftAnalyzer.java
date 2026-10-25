@@ -62,7 +62,7 @@ public class ArchitectureDriftAnalyzer extends BaseAnalyzer {
     @Override
     public AnalysisResult analyze(String sourceCode, String context) throws LLMException {
         String userPrompt = "PROJECT STRUCTURE & CONTEXT:\n" + context
-                + "\n\nSOURCE CODE / DIFF:\n" + truncateSource(sourceCode, 60000);
+                + "\n\nSOURCE CODE / DIFF:\n" + truncateSource(sourceCode, SOURCE_CHAR_LIMIT);
         String response = safeComplete(SYSTEM_PROMPT, userPrompt);
         return ResultParser.parse(response, analyzerId(), analyzerName(), logger);
     }

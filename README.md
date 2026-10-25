@@ -173,10 +173,14 @@ See the [`examples/`](examples/) directory for complete, annotated Jenkinsfiles.
 | `analyzers` | `List<String>` | All 7 analyzers | Which analyzers to run |
 | `sourceGlob` | `String` | `**/*.java,**/*.py,**/*.js,**/*.ts,**/*.go,**/*.rs` | Glob patterns for source files |
 | `contextInfo` | `String` | `""` | Project description, architecture, or constraints |
-| `failOnCritical` | `boolean` | `false` | Fail build if composite score falls below threshold |
-| `criticalThreshold` | `int` | `3` | Minimum composite score (1–10) |
+| `failOnCritical` | `boolean` | Global setting | Fail build if composite score falls below threshold, or if an analyzer fails |
+| `criticalThreshold` | `int` | Global setting | Minimum composite score (1–10) |
 
-**Returns** a `Map` with: `compositeScore`, `totalFindings`, `criticalCount`, `analyzerCount`, and per-analyzer scores (e.g., `code-reviewScore`, `vulnerabilityScore`).
+**Returns** a `Map` with: `compositeScore`, `totalFindings`, `criticalCount`, `analyzerCount`, `failedAnalyzers` (IDs of analyzers that errored or returned unparseable output), and per-analyzer scores (e.g., `code-reviewScore`, `vulnerabilityScore`).
+
+Source files are included whole, up to a 60,000-character budget (the analyzers' context window). Files that do not fit are skipped and listed in the build log, so narrow `sourceGlob` to the code you want reviewed. `commit-intel` analyzes the last 20 commits and the HEAD diff from git; it is skipped when the workspace has no git history.
+
+When the quality gate is enabled, the build also fails if any requested analyzer errors (for example, an unreachable LLM) or returns output that cannot be parsed — a gate that could not evaluate the code does not pass.
 
 ### `forgeAIScan` — Single Analyzer Step
 
@@ -262,8 +266,8 @@ The report is written to `forgeai-reports/forgeai-report.html` in the workspace.
 | Max Tokens | Maximum response length | `4096` |
 | Per-analyzer toggles | Enable or disable each analyzer globally | All enabled |
 | Publish HTML Report | Generate the HTML report artifact | `true` |
-| Fail on Low Score | Fail build below the threshold | `false` |
-| Score Threshold | Minimum passing composite score (1–10) | `3` |
+| Fail on Low Score | Fail build below the threshold (step `failOnCritical` overrides) | `false` |
+| Score Threshold | Minimum passing composite score (1–10; step `criticalThreshold` overrides) | `3` |
 | Custom System Prompt | Text prepended to every LLM prompt | — |
 
 ---

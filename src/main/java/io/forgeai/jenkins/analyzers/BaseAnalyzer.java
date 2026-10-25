@@ -13,6 +13,12 @@ import java.io.PrintStream;
  */
 public abstract class BaseAnalyzer {
 
+    /**
+     * Maximum characters of source the code analyzers send to the LLM. Callers that collect
+     * source should stay within this budget so nothing is silently cut by {@link #truncateSource}.
+     */
+    public static final int SOURCE_CHAR_LIMIT = 60_000;
+
     protected final LLMProvider llm;
     protected final PrintStream logger;
     protected final int maxTokens;

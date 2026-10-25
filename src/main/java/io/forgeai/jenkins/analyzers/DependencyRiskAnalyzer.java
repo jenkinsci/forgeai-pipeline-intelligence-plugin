@@ -8,6 +8,9 @@ import java.io.PrintStream;
 
 public class DependencyRiskAnalyzer extends BaseAnalyzer {
 
+    /** Maximum characters of dependency manifests sent to the LLM. */
+    public static final int MANIFEST_CHAR_LIMIT = 40_000;
+
     private static final String SYSTEM_PROMPT = """
             You are ForgeAI Dependency Analyst — an expert in supply-chain security and dependency management.
 
@@ -46,7 +49,7 @@ public class DependencyRiskAnalyzer extends BaseAnalyzer {
     @Override
     public AnalysisResult analyze(String sourceCode, String context) throws LLMException {
         String userPrompt = "PROJECT CONTEXT:\n" + context + "\n\nDEPENDENCY FILES:\n"
-                + truncateSource(sourceCode, 40000);
+                + truncateSource(sourceCode, MANIFEST_CHAR_LIMIT);
         String response = safeComplete(SYSTEM_PROMPT, userPrompt);
         return ResultParser.parse(response, analyzerId(), analyzerName(), logger);
     }

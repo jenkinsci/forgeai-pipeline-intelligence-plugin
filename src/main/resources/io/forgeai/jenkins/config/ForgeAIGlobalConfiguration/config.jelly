@@ -54,7 +54,7 @@
     </f:entry>
 
     <f:entry title="Fail Build on Low Score" field="failOnCritical"
-             description="Fail the build when composite score falls below the threshold.">
+             description="Fail the build when composite score falls below the threshold, or when an analyzer fails to produce a result. Pipeline steps can override this.">
       <f:checkbox default="false"/>
     </f:entry>
 

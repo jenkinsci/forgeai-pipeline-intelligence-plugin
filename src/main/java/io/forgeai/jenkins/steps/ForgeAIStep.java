@@ -4,6 +4,7 @@ import hudson.AbortException;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
+import hudson.Launcher;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import io.forgeai.jenkins.analyzers.*;
@@ -34,8 +35,8 @@ public class ForgeAIStep extends Step {
     private List<String> analyzers;
     private String sourceGlob;
     private String contextInfo;
-    private boolean failOnCritical;
-    private int criticalThreshold;
+    private Boolean failOnCritical;     // null → use the global "Fail Build on Low Score" setting
+    private Integer criticalThreshold;  // null → use the global "Score Threshold" setting
 
     @DataBoundConstructor
     public ForgeAIStep() {
@@ -43,8 +44,6 @@ public class ForgeAIStep extends Step {
                 "test-gaps", "dependency-risk", "commit-intel", "pipeline-advisor");
         this.sourceGlob = "**/*.java,**/*.py,**/*.js,**/*.ts,**/*.go,**/*.rs";
         this.contextInfo = "";
-        this.failOnCritical = false;
-        this.criticalThreshold = 3;
     }
 
     @Override
@@ -62,11 +61,11 @@ public class ForgeAIStep extends Step {
     public String getContextInfo() { return contextInfo; }
     @DataBoundSetter public void setContextInfo(String v) { this.contextInfo = v; }
 
-    public boolean isFailOnCritical() { return failOnCritical; }
-    @DataBoundSetter public void setFailOnCritical(boolean v) { this.failOnCritical = v; }
+    public Boolean getFailOnCritical() { return failOnCritical; }
+    @DataBoundSetter public void setFailOnCritical(Boolean v) { this.failOnCritical = v; }
 
-    public int getCriticalThreshold() { return criticalThreshold; }
-    @DataBoundSetter public void setCriticalThreshold(int v) { this.criticalThreshold = v; }
+    public Integer getCriticalThreshold() { return criticalThreshold; }
+    @DataBoundSetter public void setCriticalThreshold(Integer v) { this.criticalThreshold = v; }
 
     // ── Execution ─────────────────────────────────────────────────────
     private static class ForgeAIStepExecution extends SynchronousNonBlockingStepExecution<Map<String, Object>> {
@@ -84,6 +83,7 @@ public class ForgeAIStep extends Step {
             FilePath workspace = getContext().get(FilePath.class);
             Run<?, ?> build = getContext().get(Run.class);
             EnvVars env = getContext().get(EnvVars.class);
+            Launcher launcher = getContext().get(Launcher.class);
             PrintStream log = listener.getLogger();
 
             ForgeAIGlobalConfiguration cfg = ForgeAIGlobalConfiguration.get();
@@ -100,6 +100,7 @@ public class ForgeAIStep extends Step {
             String context = buildContext(workspace, env, step.getContextInfo(), log);
 
             List<AnalysisResult> results = new ArrayList<>();
+            List<String> failed = new ArrayList<>();
             Map<String, BaseAnalyzer> registry = buildAnalyzerRegistry(llm, log, maxTokens);
 
             for (String id : step.getAnalyzers()) {
@@ -136,15 +137,28 @@ public class ForgeAIStep extends Step {
                         input = collectManifests(workspace, log);
                     }
 
+                    // Commit intelligence gets git history, not source files
+                    if ("commit-intel".equals(id)) {
+                        input = collectCommitHistory(workspace, launcher, env);
+                        if (input == null) {
+                            log.println("[ForgeAI/commit-intel] No git history available in the workspace — skipping.");
+                            continue;
+                        }
+                    }
+
                     AnalysisResult result = analyzer.analyze(input, ctx);
                     result.setDurationMs(System.currentTimeMillis() - start);
                     results.add(result);
+                    if (result.isParseFailed()) {
+                        failed.add(id);
+                    }
 
                     log.printf("[ForgeAI/%s] Score: %d/10 | Findings: %d | Time: %.1fs%n",
                             id, result.getScore(), result.getFindings().size(),
                             result.getDurationMs() / 1000.0);
                 } catch (Exception e) {
                     log.println("[ForgeAI/" + id + "] ERROR: " + e.getMessage());
+                    failed.add(id);
                 }
             }
 
@@ -171,6 +185,7 @@ public class ForgeAIStep extends Step {
                     .mapToLong(r -> r.getFindings().size()).sum());
             output.put("criticalCount", results.stream()
                     .mapToLong(r -> r.countBySeverity("CRITICAL")).sum());
+            output.put("failedAnalyzers", failed);
 
             for (AnalysisResult r : results) {
                 output.put(r.getAnalyzerId() + "Score", r.getScore());
@@ -182,16 +197,31 @@ public class ForgeAIStep extends Step {
                     output.get("totalFindings"));
             log.println("╚══════════════════════════════════════════════════╝");
 
-            // ── Fail build if threshold not met ──
-            boolean shouldFail = step.isFailOnCritical()
-                    || (cfg.isFailOnCritical() && step.getCriticalThreshold() <= 0);
-            int threshold = step.getCriticalThreshold() > 0
-                    ? step.getCriticalThreshold() : cfg.getCriticalThreshold();
+            if (!failed.isEmpty()) {
+                log.println("[ForgeAI] WARNING: analyzer(s) did not produce a usable result: "
+                        + String.join(", ", failed));
+            }
 
-            if (shouldFail && composite < threshold) {
-                throw new AbortException(
-                        "[ForgeAI] BUILD FAILED — Composite score " + String.format("%.1f", composite)
-                                + " is below threshold " + threshold);
+            // ── Fail build if threshold not met ──
+            Boolean stepFail = step.getFailOnCritical();
+            Integer stepThreshold = step.getCriticalThreshold();
+            boolean shouldFail = stepFail != null ? stepFail : cfg.isFailOnCritical();
+            int threshold = stepThreshold != null && stepThreshold > 0
+                    ? stepThreshold : cfg.getCriticalThreshold();
+
+            if (shouldFail) {
+                // A gate that could not evaluate everything it was asked to must not pass.
+                if (!failed.isEmpty()) {
+                    throw new AbortException("[ForgeAI] BUILD FAILED — quality gate could not be evaluated; "
+                            + "analyzer(s) failed: " + String.join(", ", failed));
+                }
+                if (results.isEmpty()) {
+                    log.println("[ForgeAI] No analyzers ran — quality gate skipped.");
+                } else if (composite < threshold) {
+                    throw new AbortException(
+                            "[ForgeAI] BUILD FAILED — Composite score " + String.format("%.1f", composite)
+                                    + " is below threshold " + threshold);
+                }
             }
 
             return output;
@@ -199,23 +229,87 @@ public class ForgeAIStep extends Step {
 
         // ── Helper: collect source files matching glob ────────────────
         private String collectSources(FilePath workspace, String glob, PrintStream log) throws Exception {
+            return collectFiles(workspace, glob.split(","), BaseAnalyzer.SOURCE_CHAR_LIMIT, "source", log);
+        }
+
+        /**
+         * Concatenates whole files matching the given patterns, stopping at {@code budget} characters
+         * so the analyzer sees every file it is given instead of silently truncating the middle.
+         * Files that do not fit are skipped and reported in the build log.
+         */
+        private String collectFiles(FilePath workspace, String[] patterns, int budget, String kind,
+                                    PrintStream log) throws Exception {
             StringBuilder sb = new StringBuilder();
-            String[] globs = glob.split(",");
-            int fileCount = 0;
-            for (String g : globs) {
-                for (FilePath file : workspace.list(g.strip())) {
-                    if (sb.length() > 200_000) {  // stay within context limits
-                        log.println("[ForgeAI] Source collection truncated at 200KB");
-                        break;
+            Set<String> seen = new HashSet<>();
+            List<String> skipped = new ArrayList<>();
+            int included = 0;
+            for (String g : patterns) {
+                String pattern = g.strip();
+                if (pattern.isEmpty()) continue;
+                for (FilePath file : workspace.list(pattern)) {
+                    if (!seen.add(file.getRemote())) continue;
+                    String rel = relativePath(workspace, file);
+                    String header = "\n=== FILE: " + rel + " ===\n";
+                    // length() is in bytes: an upper bound on chars that avoids reading files that cannot fit
+                    if (sb.length() + header.length() + file.length() > budget) {
+                        skipped.add(rel);
+                        continue;
                     }
-                    sb.append("\n=== FILE: ").append(file.getRemote()).append(" ===\n");
-                    sb.append(file.readToString());
-                    fileCount++;
+                    sb.append(header).append(file.readToString());
+                    included++;
                 }
             }
-            log.println("[ForgeAI] Collected " + fileCount + " source files ("
-                    + (sb.length() / 1024) + " KB)");
+            log.println("[ForgeAI] Included " + included + " " + kind + " file(s) in the analysis.");
+            if (!skipped.isEmpty()) {
+                log.println("[ForgeAI] WARNING: " + skipped.size() + " " + kind + " file(s) exceeded the "
+                        + budget + "-character analysis budget and were NOT analyzed: "
+                        + String.join(", ", skipped.subList(0, Math.min(10, skipped.size())))
+                        + (skipped.size() > 10 ? ", ..." : "")
+                        + ". Narrow the glob to the files that matter.");
+            }
             return sb.toString();
+        }
+
+        private static String relativePath(FilePath workspace, FilePath file) {
+            String ws = workspace.getRemote();
+            String path = file.getRemote();
+            return path.startsWith(ws) ? path.substring(ws.length()).replaceFirst("^[/\\\\]+", "") : path;
+        }
+
+        // ── Helper: collect git history for commit intelligence ───────
+        /** Returns recent commits plus the HEAD diff, or {@code null} when git history is unavailable. */
+        private String collectCommitHistory(FilePath workspace, Launcher launcher, EnvVars env)
+                throws InterruptedException {
+            String commits = runGit(workspace, launcher, env, "log", "-n", "20", "--stat", "--no-color");
+            if (commits == null || commits.isBlank()) return null;
+
+            StringBuilder sb = new StringBuilder("=== RECENT COMMITS ===\n").append(commits.strip());
+            String diff = runGit(workspace, launcher, env, "show", "--no-color", "--format=", "HEAD");
+            if (diff != null && !diff.isBlank()) {
+                // Cut the diff rather than letting head/tail truncation drop the commit messages
+                int room = CommitIntelligenceAnalyzer.COMMIT_CHAR_LIMIT - sb.length() - 100;
+                if (room > 0) {
+                    String d = diff.strip();
+                    sb.append("\n\n=== DIFF OF HEAD COMMIT ===\n")
+                            .append(d.length() > room ? d.substring(0, room) + "\n... [diff truncated]" : d);
+                }
+            }
+            return sb.toString();
+        }
+
+        private String runGit(FilePath workspace, Launcher launcher, EnvVars env, String... args)
+                throws InterruptedException {
+            List<String> cmd = new ArrayList<>();
+            cmd.add("git");
+            cmd.addAll(Arrays.asList(args));
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try {
+                int rc = launcher.launch().cmds(cmd).envs(env).pwd(workspace).quiet(true)
+                        .stdout(out).stderr(OutputStream.nullOutputStream()).join();
+                return rc == 0 ? out.toString(StandardCharsets.UTF_8) : null;
+            } catch (IOException e) {
+                return null; // git not installed on the agent
+            }
         }
 
         // ── Helper: build context string ──────────────────────────────
@@ -262,16 +356,9 @@ public class ForgeAIStep extends Step {
                     "**/package.json", "**/requirements.txt", "**/Pipfile",
                     "**/go.mod", "**/Cargo.toml", "**/Gemfile", "**/composer.json"
             };
-            StringBuilder sb = new StringBuilder();
-            for (String g : manifestGlobs) {
-                for (FilePath f : workspace.list(g)) {
-                    if (sb.length() > 100_000) break;
-                    sb.append("\n=== ").append(f.getName()).append(" ===\n");
-                    sb.append(f.readToString());
-                }
-            }
-            if (sb.length() == 0) sb.append("(No dependency manifests found)");
-            return sb.toString();
+            String manifests = collectFiles(workspace, manifestGlobs,
+                    DependencyRiskAnalyzer.MANIFEST_CHAR_LIMIT, "manifest", log);
+            return manifests.isEmpty() ? "(No dependency manifests found)" : manifests;
         }
 
         // ── Helper: serialize prior results for release-readiness ─────
@@ -325,7 +412,7 @@ public class ForgeAIStep extends Step {
 
         @Override
         public Set<? extends Class<?>> getRequiredContext() {
-            return Set.of(TaskListener.class, FilePath.class, Run.class, EnvVars.class);
+            return Set.of(TaskListener.class, FilePath.class, Run.class, EnvVars.class, Launcher.class);
         }
     }
 }
