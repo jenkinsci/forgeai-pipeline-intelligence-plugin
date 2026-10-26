@@ -19,6 +19,7 @@ public class AnalysisResult implements Serializable {
     private String rawMarkdown;
     private final List<Finding> findings = new ArrayList<>();
     private long durationMs;
+    private boolean parseFailed;        // true when the LLM response could not be parsed
 
     public AnalysisResult(String analyzerId, String analyzerName) {
         this.analyzerId = analyzerId;
@@ -77,4 +78,6 @@ public class AnalysisResult implements Serializable {
     public List<Finding> getFindings() { return findings; }
     public long getDurationMs() { return durationMs; }
     public void setDurationMs(long v) { this.durationMs = v; }
+    public boolean isParseFailed() { return parseFailed; }
+    public void setParseFailed(boolean v) { this.parseFailed = v; }
 }

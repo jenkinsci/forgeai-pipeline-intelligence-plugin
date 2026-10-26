@@ -7,6 +7,8 @@ import com.google.gson.JsonObject;
 import io.forgeai.jenkins.reports.AnalysisResult;
 
 import java.io.PrintStream;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Parses the JSON response from any analyzer's LLM call into a structured {@link AnalysisResult}.
@@ -16,6 +18,7 @@ import java.io.PrintStream;
 public final class ResultParser {
 
     private static final Gson GSON = new Gson();
+    private static final Set<String> SEVERITIES = Set.of("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO");
 
     private ResultParser() {}
 
@@ -43,7 +46,7 @@ public final class ResultParser {
             JsonObject json = GSON.fromJson(cleaned, JsonObject.class);
 
             result.setScore(getIntOr(json, "score", 5));
-            result.setSeverity(getStringOr(json, "severity", "MEDIUM"));
+            result.setSeverity(normalizeSeverity(getStringOr(json, "severity", "MEDIUM")));
             result.setSummary(getStringOr(json, "summary", "Analysis complete."));
             result.setRawMarkdown(raw);
 
@@ -53,7 +56,7 @@ public final class ResultParser {
                     JsonObject f = el.getAsJsonObject();
                     AnalysisResult.Finding finding = new AnalysisResult.Finding(
                             getStringOr(f, "title", "Untitled"),
-                            getStringOr(f, "severity", "MEDIUM"),
+                            normalizeSeverity(getStringOr(f, "severity", "MEDIUM")),
                             getStringOr(f, "description", ""));
                     finding.setFile(getStringOr(f, "file", ""));
                     finding.setLine(getIntOr(f, "line", 0));
@@ -69,9 +72,16 @@ public final class ResultParser {
             result.setSeverity("MEDIUM");
             result.setSummary("Analysis complete (raw output — JSON parsing failed).");
             result.setRawMarkdown(raw);
+            result.setParseFailed(true);
         }
 
         return result;
+    }
+
+    /** Maps LLM-supplied severity text onto the known set; anything unrecognised becomes MEDIUM. */
+    static String normalizeSeverity(String s) {
+        String upper = s == null ? "" : s.strip().toUpperCase(Locale.ROOT);
+        return SEVERITIES.contains(upper) ? upper : "MEDIUM";
     }
 
     private static String getStringOr(JsonObject obj, String key, String fallback) {

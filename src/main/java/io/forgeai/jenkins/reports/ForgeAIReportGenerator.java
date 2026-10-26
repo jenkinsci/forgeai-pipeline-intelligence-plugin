@@ -100,7 +100,8 @@ public final class ForgeAIReportGenerator {
                 <div class="meta">%s &bull; Build #%s &bull; %s</div>
               </div>
             </div>
-            """.formatted(projectName, buildNumber, verdictColor, projectName, buildNumber, timestamp));
+            """.formatted(escHtml(projectName), escHtml(buildNumber), verdictColor,
+                escHtml(projectName), escHtml(buildNumber), timestamp));
 
         // KPI Row
         html.append("""
@@ -127,14 +128,14 @@ public final class ForgeAIReportGenerator {
                     <span class="score-badge" style="background:%s;color:#000">%d/10</span>
                   </h2>
                   <p style="color:var(--muted);font-size:0.9rem">%s</p>
-                """.formatted(r.getAnalyzerName(), badgeColor, r.getScore(), escHtml(r.getSummary())));
+                """.formatted(escHtml(r.getAnalyzerName()), badgeColor, r.getScore(), escHtml(r.getSummary())));
 
             for (AnalysisResult.Finding f : r.getFindings()) {
                 html.append("""
                     <div class="finding sev-%s">
                       <h3>[%s] %s</h3>
                       <p>%s</p>
-                    """.formatted(f.getSeverity(), f.getSeverity(), escHtml(f.getTitle()),
+                    """.formatted(escHtml(f.getSeverity()), escHtml(f.getSeverity()), escHtml(f.getTitle()),
                         escHtml(f.getDescription())));
                 if (f.getFile() != null && !f.getFile().isBlank()) {
                     html.append("<p style='font-size:0.8rem'>📄 " + escHtml(f.getFile()));
@@ -162,6 +163,6 @@ public final class ForgeAIReportGenerator {
     private static String escHtml(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;")
-                .replace(">", "&gt;").replace("\"", "&quot;");
+                .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
     }
 }

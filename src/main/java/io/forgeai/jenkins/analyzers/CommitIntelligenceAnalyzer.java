@@ -8,6 +8,9 @@ import java.io.PrintStream;
 
 public class CommitIntelligenceAnalyzer extends BaseAnalyzer {
 
+    /** Maximum characters of commit history and diff sent to the LLM. */
+    public static final int COMMIT_CHAR_LIMIT = 40_000;
+
     private static final String SYSTEM_PROMPT = """
             You are ForgeAI Commit Analyst — you evaluate commit hygiene and change quality.
 
@@ -46,7 +49,7 @@ public class CommitIntelligenceAnalyzer extends BaseAnalyzer {
     @Override
     public AnalysisResult analyze(String sourceCode, String context) throws LLMException {
         String userPrompt = "COMMIT CONTEXT:\n" + context + "\n\nCOMMIT MESSAGES + DIFF:\n"
-                + truncateSource(sourceCode, 40000);
+                + truncateSource(sourceCode, COMMIT_CHAR_LIMIT);
         String response = safeComplete(SYSTEM_PROMPT, userPrompt);
         return ResultParser.parse(response, analyzerId(), analyzerName(), logger);
     }

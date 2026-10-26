@@ -47,7 +47,7 @@ public class CodeReviewAnalyzer extends BaseAnalyzer {
     @Override
     public AnalysisResult analyze(String sourceCode, String context) throws LLMException {
         String userPrompt = "PROJECT CONTEXT:\n" + context + "\n\nCODE TO REVIEW:\n"
-                + truncateSource(sourceCode, 60000);
+                + truncateSource(sourceCode, SOURCE_CHAR_LIMIT);
         String response = safeComplete(SYSTEM_PROMPT, userPrompt);
         return ResultParser.parse(response, analyzerId(), analyzerName(), logger);
     }

@@ -16,12 +16,14 @@
     <f:textarea/>
   </f:entry>
 
-  <f:entry title="Fail on Low Score" field="failOnCritical">
+  <f:entry title="Fail on Low Score" field="failOnCritical"
+           description="Omit to use the global setting. Also fails the build when an analyzer errors.">
     <f:checkbox/>
   </f:entry>
 
-  <f:entry title="Score Threshold" field="criticalThreshold">
-    <f:textbox default="3"/>
+  <f:entry title="Score Threshold" field="criticalThreshold"
+           description="Minimum composite score (1-10). Leave empty to use the global setting.">
+    <f:number min="1" max="10"/>
   </f:entry>
 
 </j:jelly>
