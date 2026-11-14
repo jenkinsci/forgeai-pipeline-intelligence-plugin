@@ -1,0 +1,49 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout sample app') {
+            steps {
+                deleteDir()
+                // The demo copies a bundled sample instead of cloning, and commits it so
+                // commit-intel has history to read.
+                sh '''
+                    cp -r /demo-app/. .
+                    git init -q -b main
+                    git add .
+                    git -c user.name="Demo Developer" -c user.email=dev@example.com \
+                        commit -q -m "feat: add order lookup, checkout and refund endpoints"
+                '''
+            }
+        }
+
+        stage('ForgeAI') {
+            steps {
+                script {
+                    def report = forgeAI(
+                        analyzers: ['code-review', 'vulnerability', 'test-gaps', 'dependency-risk',
+                                    'commit-intel', 'pipeline-advisor', 'release-readiness'],
+                        sourceGlob: 'src/**/*.py,tests/**/*.py',
+                        contextInfo: 'Flask payments service: order lookup, checkout with discount codes, refunds, receipts'
+                    )
+                    def score = Math.round(report.compositeScore * 10) / 10
+                    echo "Composite score: ${score}/10, findings: ${report.totalFindings}"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'forgeai-reports/**', allowEmptyArchive: true
+            publishHTML(target: [
+                reportDir: 'forgeai-reports',
+                reportFiles: 'forgeai-report.html',
+                reportName: 'ForgeAI Report',
+                keepAll: true,
+                alwaysLinkToLastBuild: true,
+                allowMissing: true
+            ])
+        }
+    }
+}
