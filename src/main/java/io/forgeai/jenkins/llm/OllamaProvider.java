@@ -12,7 +12,6 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.verb.POST;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Ollama provider for air-gapped / local LLM inference.
@@ -40,10 +39,7 @@ public class OllamaProvider extends LLMProvider {
         String ep = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT
                 : (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint);
 
-        OkHttpClient client = new OkHttpClient.Builder()
-                .connectTimeout(timeout, TimeUnit.SECONDS)
-                .readTimeout(timeout * 3L, TimeUnit.SECONDS) // local models can be slow
-                .build();
+        OkHttpClient client = httpClient(timeout, timeout * 3L); // local models can be slow
 
         JsonObject options = new JsonObject();
         options.addProperty("temperature", cfg.getTemperature());
@@ -78,16 +74,17 @@ public class OllamaProvider extends LLMProvider {
     public boolean healthCheck() {
         String ep = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT
                 : (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint);
-        OkHttpClient client = new OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+        OkHttpClient client = httpClient(5, 5);
         try (Response r = client.newCall(new Request.Builder().url(ep + "/api/tags").build()).execute()) {
             return r.isSuccessful();
         } catch (IOException e) {
             return false;
         }
     }
+
+    /** A local Ollama server usually serves one request at a time; queued requests would hit the read timeout. */
+    @Override
+    public int defaultParallelism() { return 1; }
 
     @Override
     public String displayName() { return "Ollama Local (" + modelId + ")"; }

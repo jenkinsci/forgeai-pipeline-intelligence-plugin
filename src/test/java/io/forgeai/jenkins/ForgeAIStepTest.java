@@ -5,6 +5,7 @@ import hudson.model.Result;
 import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
 import io.forgeai.jenkins.llm.LLMException;
 import io.forgeai.jenkins.llm.LLMProvider;
+import io.forgeai.jenkins.llm.OllamaProvider;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -133,6 +135,48 @@ class ForgeAIStepTest {
         assertTrue(prompt.contains("DIFF OF HEAD COMMIT"), "HEAD diff should reach the LLM");
     }
 
+    @Test
+    void analyzersCallTheLlmInParallel() throws Exception {
+        llm.delayMs = 400;
+
+        WorkflowRun b = run("forgeAI analyzers: ['code-review', 'vulnerability', 'architecture-drift', 'test-gaps'], "
+                + "sourceGlob: 'src/**/*.java'", Result.SUCCESS);
+
+        assertTrue(llm.maxInFlight.get() > 1, "expected overlapping LLM calls, saw " + llm.maxInFlight.get());
+        assertTrue(llm.maxInFlight.get() <= 4, "must not exceed the provider default of 4");
+        j.assertLogContains("Running 4 analyzers, up to 4 at a time.", b);
+    }
+
+    @Test
+    void parallelismOfOneRunsAnalyzersOneAtATime() throws Exception {
+        cfg.setMaxParallelRequests(1);
+        llm.delayMs = 100;
+
+        run("forgeAI analyzers: ['code-review', 'vulnerability', 'test-gaps'], sourceGlob: 'src/**/*.java'", Result.SUCCESS);
+
+        assertEquals(1, llm.maxInFlight.get());
+        assertEquals(3, llm.prompts.size());
+    }
+
+    @Test
+    void ollamaDefaultsToOneRequestAtATime() {
+        cfg.setProvider(new OllamaProvider());
+        assertEquals(1, cfg.effectiveParallelism());
+        cfg.setMaxParallelRequests(3);
+        assertEquals(3, cfg.effectiveParallelism());
+    }
+
+    @Test
+    void releaseReadinessRunsLastWithEveryOtherResult() throws Exception {
+        run("forgeAI analyzers: ['release-readiness', 'code-review', 'vulnerability'], sourceGlob: 'src/**/*.java'",
+                Result.SUCCESS);
+
+        assertEquals(3, llm.prompts.size());
+        String last = llm.prompts.get(2);
+        assertTrue(last.contains("Analyzer: AI Code Review"), "release-readiness should see code-review's result");
+        assertTrue(last.contains("Analyzer: Security Vulnerability Analysis"), "and vulnerability's result");
+    }
+
     // ── helpers ───────────────────────────────────────────────────────
 
     private WorkflowRun run(String step, Result expected) throws Exception {
@@ -172,12 +216,24 @@ class ForgeAIStepTest {
         private static final long serialVersionUID = 1L;
 
         final List<String> prompts = new CopyOnWriteArrayList<>();
+        final AtomicInteger inFlight = new AtomicInteger();
+        final AtomicInteger maxInFlight = new AtomicInteger();
         volatile String response = HIGH_SCORE;
         volatile boolean fail;
+        volatile long delayMs;
 
         @Override
         public String complete(String systemPrompt, String userPrompt, int maxTokens) throws LLMException {
             prompts.add(userPrompt);
+            maxInFlight.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
+            try {
+                if (delayMs > 0) Thread.sleep(delayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new LLMException("interrupted", e, displayName());
+            } finally {
+                inFlight.decrementAndGet();
+            }
             if (fail) throw new LLMException("simulated outage", 503, displayName());
             return response;
         }

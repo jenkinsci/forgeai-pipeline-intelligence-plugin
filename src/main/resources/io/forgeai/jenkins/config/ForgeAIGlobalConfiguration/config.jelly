@@ -22,6 +22,11 @@
       <f:number clazz="setting-input" min="256" default="4096"/>
     </f:entry>
 
+    <f:entry title="Parallel LLM Requests" field="maxParallelRequests"
+             description="How many analyzers call the LLM at once. 0 = automatic: 4 for cloud providers, 1 for Ollama. Lower it if your provider rate-limits you.">
+      <f:number clazz="setting-input" min="0" default="0"/>
+    </f:entry>
+
     <!-- ── Analyzer Modules ──────────────────────────────────────── -->
     <f:entry title="AI Code Review" field="enableCodeReview">
       <f:checkbox default="true"/>

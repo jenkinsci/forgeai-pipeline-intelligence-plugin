@@ -264,11 +264,14 @@ The report is written to `forgeai-reports/forgeai-report.html` in the workspace.
 | Temperature | LLM creativity (0.0–1.0) | `0.2` |
 | Timeout | Request timeout in seconds | `120` |
 | Max Tokens | Maximum response length | `4096` |
+| Parallel LLM Requests | Analyzers that call the LLM at once; `0` = automatic (4 for cloud providers, 1 for Ollama) | `0` |
 | Per-analyzer toggles | Enable or disable each analyzer globally | All enabled |
 | Publish HTML Report | Generate the HTML report artifact | `true` |
 | Fail on Low Score | Fail build below the threshold (step `failOnCritical` overrides) | `false` |
 | Score Threshold | Minimum passing composite score (1–10; step `criticalThreshold` overrides) | `3` |
 | Custom System Prompt | Text prepended to every LLM prompt | — |
+
+LLM requests use the proxy configured in **Manage Jenkins → System → HTTP Proxy Configuration**, including its no-proxy hosts and proxy credentials.
 
 ---
 
