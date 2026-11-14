@@ -28,6 +28,7 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
     private double temperature    = 0.2;
     private int    timeoutSeconds = 120;
     private int    maxTokens      = 4096;
+    private int    maxSourceChunks = 4;       // LLM requests one analyzer may spend on source that exceeds one request
     private int    maxParallelRequests = 0;   // 0 → provider default (see LLMProvider#defaultParallelism)
 
     // ── Feature Toggles ────────────────────────────────────────────
@@ -92,6 +93,9 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
 
     public int getMaxTokens() { return maxTokens > 0 ? maxTokens : 4096; }
     @DataBoundSetter public void setMaxTokens(int v) { this.maxTokens = v; }
+
+    public int getMaxSourceChunks() { return maxSourceChunks > 0 ? maxSourceChunks : 1; }
+    @DataBoundSetter public void setMaxSourceChunks(int v) { this.maxSourceChunks = v; }
 
     public int getMaxParallelRequests() { return maxParallelRequests; }
     @DataBoundSetter public void setMaxParallelRequests(int v) { this.maxParallelRequests = Math.max(0, v); }

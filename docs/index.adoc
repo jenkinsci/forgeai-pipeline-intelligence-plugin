@@ -165,6 +165,10 @@ Navigate to *Manage Jenkins → System → ForgeAI Pipeline Intelligence*:
 |Maximum response length
 |`4096`
 
+|Max Source Chunks per Analyzer
+|LLM requests one analyzer may use when the source exceeds one request
+|`4`
+
 |Parallel LLM Requests
 |Analyzers that call the LLM at once; `0` = automatic (4 for cloud providers, 1 for Ollama)
 |`0`
@@ -248,6 +252,16 @@ stage('ForgeAI Intelligence') {
 |`""`
 |Project description, architecture, or constraints
 
+|`scope`
+|`String`
+|`auto`
+|`auto`, `changes` or `all`: which files the code analyzers read (see below)
+
+|`baseRef`
+|`String`
+|PR target
+|Branch, tag or commit to compare against when analyzing changes
+
 |`failOnCritical`
 |`boolean`
 |Global setting
@@ -259,9 +273,26 @@ stage('ForgeAI Intelligence') {
 |Minimum composite score (1–10)
 |===
 
-*Returns* a `Map` with: `compositeScore`, `totalFindings`, `criticalCount`, `analyzerCount`, `failedAnalyzers` (IDs of analyzers that errored or returned unparseable output), and per-analyzer scores (e.g., `code-reviewScore`, `vulnerabilityScore`).
+*Returns* a `Map` with: `compositeScore`, `totalFindings`, `criticalCount`, `analyzerCount`, `failedAnalyzers` (IDs of analyzers that errored or returned unparseable output), `analysisScope` (`changes` or `all`), `filesAnalyzed`, `filesSkipped`, and per-analyzer scores (e.g., `code-reviewScore`, `vulnerabilityScore`).
 
-Source files are included whole, up to a 60,000-character budget (the analyzers' context window). Files that do not fit are skipped and listed in the build log, so narrow `sourceGlob` to the code you want reviewed. `commit-intel` analyzes the last 20 commits and the HEAD diff from git; it is skipped when the workspace has no git history.
+==== What gets analyzed
+
+On a pull request build, the code analyzers read only the files the pull request changed. `scope: 'auto'` (the default) detects this from `CHANGE_TARGET`, which multibranch pipelines set, and compares against that target branch. On other builds it analyzes every file matching `sourceGlob`.
+
+* `scope: 'changes'` always analyzes only changed files. The base is `baseRef` if you set it, else the pull request target, else the previous build's commit (`GIT_PREVIOUS_SUCCESSFUL_COMMIT`).
+* `scope: 'all'` always analyzes every matching file.
+
+The base branch must exist in the workspace's git repository. If ForgeAI cannot find it, it logs a warning and analyzes all files. When no source file changed, the code analyzers are skipped and make no LLM calls.
+
+[source,groovy]
+----
+// Compare a branch build against main
+forgeAI scope: 'changes', baseRef: 'origin/main'
+----
+
+Files are sent whole. One LLM request holds 60,000 characters; larger inputs are split across several requests per analyzer (up to *Max Source Chunks per Analyzer*, default 4) and the results are merged: the score is the average, the severity is the worst, and all findings are kept. Files beyond that are skipped and listed in the build log.
+
+`commit-intel` analyzes the commits and diff since the base when one is known, otherwise the last 20 commits and the HEAD diff. It is skipped when the workspace has no git history.
 
 When the quality gate is enabled, the build also fails if any requested analyzer errors (for example, an unreachable LLM) or returns output that cannot be parsed — a gate that could not evaluate the code does not pass.
 
