@@ -3,3 +3,4 @@ configuration-as-code
 job-dsl
 workflow-aggregator
 htmlpublisher
+warnings-ng
