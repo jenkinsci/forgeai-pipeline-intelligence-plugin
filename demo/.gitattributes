@@ -1,0 +1,2 @@
+# These files are mounted into Linux containers; CRLF would break the shell steps.
+* text=auto eol=lf

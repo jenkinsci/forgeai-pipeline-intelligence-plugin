@@ -1,0 +1,37 @@
+jenkins:
+  systemMessage: "ForgeAI demo: local only. Run the forgeai-demo job to see an analysis."
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: "http://localhost:${JENKINS_PORT}/"
+  forgeAI:
+    provider:
+      ollama:
+        endpoint: "http://ollama:11434"
+        modelId: "${OLLAMA_MODEL}"
+    timeoutSeconds: 300
+    temperature: 0.1
+    publishHtmlReport: true
+    failOnCritical: false
+
+jobs:
+  - script: |
+      pipelineJob('forgeai-demo') {
+        description('Copies the sample payments service into the workspace and analyzes it with ForgeAI and a local Ollama model.')
+        definition {
+          cps {
+            script(new File('/demo-app/Jenkinsfile').text)
+            sandbox(true)
+          }
+        }
+      }

@@ -75,6 +75,9 @@ ForgeAI is **provider-agnostic**. Use whatever fits your security and budget req
 
 ## Quick Start
 
+> **Just want to see it work?** [`demo/`](demo) starts Jenkins with ForgeAI and a local Ollama model in
+> one `docker compose up`, with a sample job ready to run. No API key, nothing leaves your machine.
+
 ### 1. Install the Plugin
 
 **From the Jenkins Update Center (recommended):**

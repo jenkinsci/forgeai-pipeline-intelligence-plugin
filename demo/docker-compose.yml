@@ -1,0 +1,50 @@
+# ForgeAI quickstart: Jenkins + a local Ollama model, configured as code.
+#
+#   docker compose up -d --build
+#   open http://localhost:8080   (user: admin, password: forgeai)
+#   run the "forgeai-demo" job
+#
+# Everything stays on this machine. See README.md for details.
+
+name: forgeai-demo
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.4
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # One-shot: downloads the model, then exits. Re-runs are instant once it is cached.
+  ollama-pull:
+    image: ollama/ollama:0.40.4
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: ollama:11434
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-qwen2.5-coder:3b}"]
+    restart: "no"
+
+  jenkins:
+    build: ./jenkins
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${JENKINS_PORT:-8080}:8080"
+    environment:
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-forgeai}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:3b}
+      JENKINS_PORT: ${JENKINS_PORT:-8080}
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - ./sample-app:/demo-app:ro
+
+volumes:
+  ollama-models:
+  jenkins-home:
