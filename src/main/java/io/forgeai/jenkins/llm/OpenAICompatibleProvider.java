@@ -14,7 +14,6 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.verb.POST;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * OpenAI-compatible provider. Works with OpenAI, Azure OpenAI, LM Studio, vLLM, LocalAI, and any
@@ -43,10 +42,7 @@ public class OpenAICompatibleProvider extends LLMProvider {
         String ep = (endpoint == null || endpoint.isBlank()) ? DEFAULT_ENDPOINT
                 : (endpoint.endsWith("/") ? endpoint : endpoint + "/");
 
-        OkHttpClient client = new OkHttpClient.Builder()
-                .connectTimeout(cfg.getTimeoutSeconds(), TimeUnit.SECONDS)
-                .readTimeout(cfg.getTimeoutSeconds() * 2L, TimeUnit.SECONDS)
-                .build();
+        OkHttpClient client = httpClient(cfg.getTimeoutSeconds(), cfg.getTimeoutSeconds() * 2L);
 
         JsonObject body = new JsonObject();
         body.addProperty("model", modelId);

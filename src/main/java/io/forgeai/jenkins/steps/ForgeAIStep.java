@@ -7,8 +7,11 @@ import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.Run;
 import hudson.model.TaskListener;
+import hudson.util.DaemonThreadFactory;
+import hudson.util.NamingThreadFactory;
 import io.forgeai.jenkins.analyzers.*;
 import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
+import io.forgeai.jenkins.llm.LLMException;
 import io.forgeai.jenkins.llm.LLMProvider;
 
 import io.forgeai.jenkins.reports.AnalysisResult;
@@ -20,6 +23,10 @@ import org.kohsuke.stapler.DataBoundSetter;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 /**
@@ -103,6 +110,9 @@ public class ForgeAIStep extends Step {
             List<String> failed = new ArrayList<>();
             Map<String, BaseAnalyzer> registry = buildAnalyzerRegistry(llm, log, maxTokens);
 
+            // Phase 1: gather each analyzer's input from the workspace (sequential I/O)
+            List<Job> jobs = new ArrayList<>();
+            BaseAnalyzer releaseReadiness = null;
             for (String id : step.getAnalyzers()) {
                 BaseAnalyzer analyzer = registry.get(id);
                 if (analyzer == null) {
@@ -116,16 +126,14 @@ public class ForgeAIStep extends Step {
                     continue;
                 }
 
-                log.println("\n━━━ Running: " + analyzer.analyzerName() + " ━━━");
-                long start = System.currentTimeMillis();
+                // Release readiness weighs the other results, so it runs after them
+                if ("release-readiness".equals(id)) {
+                    releaseReadiness = analyzer;
+                    continue;
+                }
+
                 try {
                     String input = sourceCode;
-                    String ctx = context;
-
-                    // Release readiness gets the prior results as input
-                    if ("release-readiness".equals(id) && !results.isEmpty()) {
-                        ctx = serializeResults(results);
-                    }
 
                     // Pipeline advisor gets the Jenkinsfile
                     if ("pipeline-advisor".equals(id)) {
@@ -145,21 +153,19 @@ public class ForgeAIStep extends Step {
                             continue;
                         }
                     }
-
-                    AnalysisResult result = analyzer.analyze(input, ctx);
-                    result.setDurationMs(System.currentTimeMillis() - start);
-                    results.add(result);
-                    if (result.isParseFailed()) {
-                        failed.add(id);
-                    }
-
-                    log.printf("[ForgeAI/%s] Score: %d/10 | Findings: %d | Time: %.1fs%n",
-                            id, result.getScore(), result.getFindings().size(),
-                            result.getDurationMs() / 1000.0);
+                    jobs.add(new Job(id, analyzer, input, context));
                 } catch (Exception e) {
                     log.println("[ForgeAI/" + id + "] ERROR: " + e.getMessage());
                     failed.add(id);
                 }
+            }
+
+            // Phase 2: LLM calls, several at once
+            results.addAll(runJobs(jobs, cfg.effectiveParallelism(), log, failed));
+            if (releaseReadiness != null) {
+                String ctx = results.isEmpty() ? context : serializeResults(results);
+                Job rr = new Job("release-readiness", releaseReadiness, sourceCode, ctx);
+                results.addAll(runJobs(List.of(rr), 1, log, failed));
             }
 
             // ── Generate HTML Report ──
@@ -225,6 +231,57 @@ public class ForgeAIStep extends Step {
             }
 
             return output;
+        }
+
+        /** One analyzer with the input it should analyze. */
+        private record Job(String id, BaseAnalyzer analyzer, String input, String context) {}
+
+        /**
+         * Runs the jobs with up to {@code parallelism} LLM requests in flight and returns their results
+         * in job order. Failures are logged and recorded in {@code failed}; parse failures still return a result.
+         */
+        private List<AnalysisResult> runJobs(List<Job> jobs, int parallelism, PrintStream log, List<String> failed)
+                throws InterruptedException {
+            if (jobs.isEmpty()) return List.of();
+            int threads = Math.max(1, Math.min(parallelism, jobs.size()));
+            if (threads > 1) {
+                log.println("\n[ForgeAI] Running " + jobs.size() + " analyzers, up to " + threads + " at a time.");
+            }
+            ExecutorService pool = Executors.newFixedThreadPool(threads,
+                    new NamingThreadFactory(new DaemonThreadFactory(), "ForgeAI analyzer"));
+            try {
+                List<Future<AnalysisResult>> futures = new ArrayList<>();
+                for (Job job : jobs) {
+                    futures.add(pool.submit(() -> runJob(job, log)));
+                }
+                List<AnalysisResult> out = new ArrayList<>();
+                for (int i = 0; i < jobs.size(); i++) {
+                    String id = jobs.get(i).id();
+                    try {
+                        AnalysisResult result = futures.get(i).get();
+                        out.add(result);
+                        if (result.isParseFailed()) {
+                            failed.add(id);
+                        }
+                    } catch (ExecutionException e) {
+                        log.println("[ForgeAI/" + id + "] ERROR: " + e.getCause().getMessage());
+                        failed.add(id);
+                    }
+                }
+                return out;
+            } finally {
+                pool.shutdownNow(); // also cancels in-flight work if the build was aborted
+            }
+        }
+
+        private static AnalysisResult runJob(Job job, PrintStream log) throws LLMException {
+            log.println("\n━━━ Running: " + job.analyzer().analyzerName() + " ━━━");
+            long start = System.currentTimeMillis();
+            AnalysisResult result = job.analyzer().analyze(job.input(), job.context());
+            result.setDurationMs(System.currentTimeMillis() - start);
+            log.printf("[ForgeAI/%s] Score: %d/10 | Findings: %d | Time: %.1fs%n",
+                    job.id(), result.getScore(), result.getFindings().size(), result.getDurationMs() / 1000.0);
+            return result;
         }
 
         // ── Helper: collect source files matching glob ────────────────

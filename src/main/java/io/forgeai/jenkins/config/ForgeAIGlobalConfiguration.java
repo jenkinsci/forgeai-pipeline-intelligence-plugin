@@ -28,6 +28,7 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
     private double temperature    = 0.2;
     private int    timeoutSeconds = 120;
     private int    maxTokens      = 4096;
+    private int    maxParallelRequests = 0;   // 0 → provider default (see LLMProvider#defaultParallelism)
 
     // ── Feature Toggles ────────────────────────────────────────────
     private boolean enableCodeReview          = true;
@@ -91,6 +92,15 @@ public class ForgeAIGlobalConfiguration extends GlobalConfiguration {
 
     public int getMaxTokens() { return maxTokens > 0 ? maxTokens : 4096; }
     @DataBoundSetter public void setMaxTokens(int v) { this.maxTokens = v; }
+
+    public int getMaxParallelRequests() { return maxParallelRequests; }
+    @DataBoundSetter public void setMaxParallelRequests(int v) { this.maxParallelRequests = Math.max(0, v); }
+
+    /** Number of analyzer LLM requests to run at once: the configured value, or the provider's default when 0. */
+    public int effectiveParallelism() {
+        if (maxParallelRequests > 0) return maxParallelRequests;
+        return provider != null ? Math.max(1, provider.defaultParallelism()) : 1;
+    }
 
     public boolean isEnableCodeReview() { return enableCodeReview; }
     @DataBoundSetter public void setEnableCodeReview(boolean v) { this.enableCodeReview = v; }

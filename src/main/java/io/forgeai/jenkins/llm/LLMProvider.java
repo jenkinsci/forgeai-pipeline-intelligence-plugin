@@ -10,7 +10,9 @@ import hudson.model.Describable;
 import hudson.model.Descriptor;
 import hudson.security.ACL;
 import hudson.util.ListBoxModel;
+import io.jenkins.plugins.okhttp.api.JenkinsOkHttpClient;
 import jenkins.model.Jenkins;
+import okhttp3.OkHttpClient;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
@@ -18,6 +20,7 @@ import org.kohsuke.stapler.verb.POST;
 
 import java.io.Serializable;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Extension point for LLM backends. Implement this interface (plus a Descriptor) to add a new
@@ -26,6 +29,9 @@ import java.util.Collections;
 public abstract class LLMProvider implements ExtensionPoint, Describable<LLMProvider>, Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    /** Shared base client so all providers reuse one connection pool. */
+    private static final OkHttpClient BASE_CLIENT = new OkHttpClient();
 
     protected String endpoint;
     protected String modelId;
@@ -36,6 +42,23 @@ public abstract class LLMProvider implements ExtensionPoint, Describable<LLMProv
     public abstract boolean healthCheck();
 
     public abstract String displayName();
+
+    /**
+     * How many analyzer requests this provider handles well at once, used when the global
+     * "Parallel LLM requests" setting is left at 0 (automatic).
+     */
+    public int defaultParallelism() { return 4; }
+
+    /**
+     * Builds an HTTP client that honours the Jenkins proxy settings
+     * (Manage Jenkins → System → HTTP Proxy Configuration), including no-proxy hosts and proxy credentials.
+     */
+    protected static OkHttpClient httpClient(long connectTimeoutSeconds, long readTimeoutSeconds) {
+        return JenkinsOkHttpClient.newClientBuilder(BASE_CLIENT)
+                .connectTimeout(connectTimeoutSeconds, TimeUnit.SECONDS)
+                .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
+                .build();
+    }
 
     public String getEndpoint() { return endpoint; }
     @DataBoundSetter public void setEndpoint(String v) { this.endpoint = v; }

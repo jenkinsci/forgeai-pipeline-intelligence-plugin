@@ -165,6 +165,10 @@ Navigate to *Manage Jenkins → System → ForgeAI Pipeline Intelligence*:
 |Maximum response length
 |`4096`
 
+|Parallel LLM Requests
+|Analyzers that call the LLM at once; `0` = automatic (4 for cloud providers, 1 for Ollama)
+|`0`
+
 |Per-analyzer toggles
 |Enable or disable each analyzer globally
 |All enabled
@@ -186,11 +190,13 @@ Navigate to *Manage Jenkins → System → ForgeAI Pipeline Intelligence*:
 |—
 |===
 
+LLM requests use the proxy configured in *Manage Jenkins → System → HTTP Proxy Configuration*, including its no-proxy hosts and proxy credentials.
+
 == Pipeline DSL Reference
 
 === `forgeAI` — Full Analysis Step
 
-Runs multiple analyzers in sequence and produces a composite report.
+Runs the selected analyzers, several at once, then Release Readiness last, and produces a composite report.
 
 [source,groovy]
 ----
