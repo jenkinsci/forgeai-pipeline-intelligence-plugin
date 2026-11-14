@@ -92,7 +92,7 @@ Model ID:   deepseek-coder:6.7b
 API Key:    (leave empty)
 ```
 
-Make sure Ollama is running: `ollama serve`
+Make sure Ollama is running: `ollama serve`. ForgeAI calls the LLM from the Jenkins controller, so the endpoint must be reachable from the controller (`localhost` is the controller's machine).
 
 ### Using OpenAI
 
