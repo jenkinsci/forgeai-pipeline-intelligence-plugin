@@ -181,7 +181,7 @@ See the [`examples/`](examples/) directory for complete, annotated Jenkinsfiles.
 | `failOnCritical` | `boolean` | Global setting | Fail build if composite score falls below threshold, or if an analyzer fails |
 | `criticalThreshold` | `int` | Global setting | Minimum composite score (1–10) |
 
-**Returns** a `Map` with: `compositeScore`, `totalFindings`, `criticalCount`, `analyzerCount`, `failedAnalyzers` (IDs of analyzers that errored or returned unparseable output), `analysisScope` (`changes` or `all`), `filesAnalyzed`, `filesSkipped`, and per-analyzer scores (e.g., `code-reviewScore`, `vulnerabilityScore`).
+**Returns** a `Map` with: `compositeScore`, `totalFindings`, `criticalCount`, `analyzerCount`, `failedAnalyzers` (IDs of analyzers that errored or returned unparseable output), `analysisScope` (`changes` or `all`), `filesAnalyzed`, `filesSkipped`, `sarifFile`, and per-analyzer scores (e.g., `code-reviewScore`, `vulnerabilityScore`).
 
 #### What gets analyzed
 
@@ -271,6 +271,23 @@ Every build generates a self-contained HTML report with:
 - **Dark theme** optimised for readability
 
 The report is written to `forgeai-reports/forgeai-report.html` in the workspace. Use `publishHTML` (HTML Publisher plugin) or `archiveArtifacts` to surface it on the build page.
+
+### SARIF for Warnings NG and code scanning
+
+Every run also writes `forgeai-reports/forgeai-report.sarif`, the findings in [SARIF 2.1.0](https://sarifweb.azurewebsites.net/), the standard format for static-analysis results. The step returns its path as `sarifFile`.
+
+With the [Warnings NG plugin](https://plugins.jenkins.io/warnings-ng/), findings appear on the build page with source annotations, trend charts and Warnings NG's own quality gates:
+
+```groovy
+def report = forgeAI(analyzers: ['code-review', 'vulnerability'])
+recordIssues tool: sarif(pattern: report.sarifFile, id: 'forgeai', name: 'ForgeAI')
+```
+
+The same file can be uploaded to GitHub code scanning or any other SARIF consumer.
+
+* Each analyzer is a rule (`forgeai/code-review`, `forgeai/vulnerability`, ...).
+* CRITICAL and HIGH findings are reported as `error`, MEDIUM as `warning`, LOW and INFO as `note`.
+* Only findings with a file location are included, because SARIF consumers anchor results to source. Findings without one, such as release-readiness verdicts, stay in the HTML report. Pipeline advisor findings point at the `Jenkinsfile`.
 
 ---
 

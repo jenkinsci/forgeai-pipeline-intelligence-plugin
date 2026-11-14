@@ -292,6 +292,26 @@ class ForgeAIStepTest {
         j.assertLogContains("were NOT analyzed", b);
     }
 
+    // ── reports ───────────────────────────────────────────────────────
+
+    @Test
+    void writesSarifReportAndReturnsItsPath() throws Exception {
+        llm.response = "{\"score\":6,\"severity\":\"HIGH\",\"summary\":\"One issue.\",\"findings\":[{\"title\":\"SQL injection\","
+                + "\"severity\":\"HIGH\",\"description\":\"Query built by concatenation.\",\"file\":\"src/Small.java\","
+                + "\"line\":1,\"suggestion\":\"Use a prepared statement.\"}]}";
+        WorkflowJob p = j.createProject(WorkflowJob.class, "sarif");
+
+        WorkflowRun b = run(p, "def r = forgeAI(analyzers: ['vulnerability'], sourceGlob: 'src/**/*.java')\n"
+                + "echo \"sarif=${r.sarifFile}\"", Result.SUCCESS);
+
+        j.assertLogContains("sarif=forgeai-reports/forgeai-report.sarif", b);
+        j.assertLogContains("1 finding(s) with a file location", b);
+        String sarif = j.jenkins.getWorkspaceFor(p).child("forgeai-reports/forgeai-report.sarif").readToString();
+        assertTrue(sarif.contains("\"ruleId\": \"forgeai/vulnerability\""), sarif);
+        assertTrue(sarif.contains("\"uri\": \"src/Small.java\""), sarif);
+        assertTrue(sarif.contains("\"level\": \"error\""), sarif);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────
 
     /**

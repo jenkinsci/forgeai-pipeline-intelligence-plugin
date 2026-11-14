@@ -16,6 +16,7 @@ import io.forgeai.jenkins.llm.LLMProvider;
 
 import io.forgeai.jenkins.reports.AnalysisResult;
 import io.forgeai.jenkins.reports.ForgeAIReportGenerator;
+import io.forgeai.jenkins.reports.ForgeAISarifGenerator;
 import org.jenkinsci.plugins.workflow.steps.*;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
@@ -46,6 +47,9 @@ public class ForgeAIStep extends Step {
     public static final String SCOPE_CHANGES = "changes";
     /** Analyze every file matching {@code sourceGlob}. */
     public static final String SCOPE_ALL = "all";
+
+    private static final String REPORT_DIR = "forgeai-reports";
+    private static final String SARIF_FILE = REPORT_DIR + "/forgeai-report.sarif";
 
     private List<String> analyzers;
     private String sourceGlob;
@@ -234,21 +238,29 @@ public class ForgeAIStep extends Step {
                 }
             }
 
-            // ── Generate HTML Report ──
-            if (cfg.isPublishHtmlReport() && !results.isEmpty()) {
-                String projectName = build.getParent().getFullName();
-                String buildNum = String.valueOf(build.getNumber());
-                String html = ForgeAIReportGenerator.generateHtml(results, projectName, buildNum);
-
-                FilePath reportDir = new FilePath(workspace, "forgeai-reports");
+            // ── Generate reports ──
+            Map<String, Object> output = new LinkedHashMap<>();
+            if (!results.isEmpty()) {
+                FilePath reportDir = new FilePath(workspace, REPORT_DIR);
                 reportDir.mkdirs();
-                FilePath reportFile = new FilePath(reportDir, "forgeai-report.html");
-                reportFile.write(html, StandardCharsets.UTF_8.name());
-                log.println("\n📊 ForgeAI report saved to: forgeai-reports/forgeai-report.html");
+
+                if (cfg.isPublishHtmlReport()) {
+                    String projectName = build.getParent().getFullName();
+                    String buildNum = String.valueOf(build.getNumber());
+                    String html = ForgeAIReportGenerator.generateHtml(results, projectName, buildNum);
+                    new FilePath(reportDir, "forgeai-report.html").write(html, StandardCharsets.UTF_8.name());
+                    log.println("\n📊 ForgeAI report saved to: " + REPORT_DIR + "/forgeai-report.html");
+                }
+
+                // SARIF for Warnings NG, code scanning and other static-analysis consumers
+                new FilePath(reportDir, "forgeai-report.sarif")
+                        .write(ForgeAISarifGenerator.generate(results), StandardCharsets.UTF_8.name());
+                log.println("[ForgeAI] SARIF saved to: " + SARIF_FILE + " ("
+                        + ForgeAISarifGenerator.locatedFindings(results) + " finding(s) with a file location)");
+                output.put("sarifFile", SARIF_FILE);
             }
 
             // ── Build return map for pipeline consumption ──
-            Map<String, Object> output = new LinkedHashMap<>();
             double composite = results.stream().mapToInt(AnalysisResult::getScore)
                     .average().orElse(5.0);
             output.put("compositeScore", composite);
