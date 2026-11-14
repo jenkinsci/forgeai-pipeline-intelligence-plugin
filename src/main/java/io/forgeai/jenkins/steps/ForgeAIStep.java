@@ -20,7 +20,8 @@ import org.jenkinsci.plugins.workflow.steps.*;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -39,9 +40,18 @@ import java.util.stream.Collectors;
  */
 public class ForgeAIStep extends Step {
 
+    /** Analyze changed files on pull request builds, everything otherwise. */
+    public static final String SCOPE_AUTO = "auto";
+    /** Analyze only files changed since the base revision. */
+    public static final String SCOPE_CHANGES = "changes";
+    /** Analyze every file matching {@code sourceGlob}. */
+    public static final String SCOPE_ALL = "all";
+
     private List<String> analyzers;
     private String sourceGlob;
     private String contextInfo;
+    private String scope;
+    private String baseRef;
     private Boolean failOnCritical;     // null → use the global "Fail Build on Low Score" setting
     private Integer criticalThreshold;  // null → use the global "Score Threshold" setting
 
@@ -51,6 +61,8 @@ public class ForgeAIStep extends Step {
                 "test-gaps", "dependency-risk", "commit-intel", "pipeline-advisor");
         this.sourceGlob = "**/*.java,**/*.py,**/*.js,**/*.ts,**/*.go,**/*.rs";
         this.contextInfo = "";
+        this.scope = SCOPE_AUTO;
+        this.baseRef = "";
     }
 
     @Override
@@ -67,6 +79,12 @@ public class ForgeAIStep extends Step {
 
     public String getContextInfo() { return contextInfo; }
     @DataBoundSetter public void setContextInfo(String v) { this.contextInfo = v; }
+
+    public String getScope() { return scope; }
+    @DataBoundSetter public void setScope(String v) { this.scope = v; }
+
+    public String getBaseRef() { return baseRef; }
+    @DataBoundSetter public void setBaseRef(String v) { this.baseRef = v; }
 
     public Boolean getFailOnCritical() { return failOnCritical; }
     @DataBoundSetter public void setFailOnCritical(Boolean v) { this.failOnCritical = v; }
@@ -96,18 +114,44 @@ public class ForgeAIStep extends Step {
             ForgeAIGlobalConfiguration cfg = ForgeAIGlobalConfiguration.get();
             LLMProvider llm = cfg.getProvider();
             int maxTokens = cfg.getMaxTokens();
+            String scope = normalizeScope(step.getScope());
 
             log.println("╔══════════════════════════════════════════════════╗");
             log.println("║   🔥 ForgeAI Pipeline Intelligence v1.0         ║");
             log.println("║   Provider: " + padRight(llm.displayName(), 37) + "║");
             log.println("╚══════════════════════════════════════════════════╝");
 
-            // Collect source code from workspace
-            String sourceCode = collectSources(workspace, step.getSourceGlob(), log);
-            String context = buildContext(workspace, env, step.getContextInfo(), log);
+            WorkspaceInputs inputs = new WorkspaceInputs(workspace, launcher, env, log);
+
+            // ── Decide what to analyze: only what changed, or everything matching the glob ──
+            String base = null;
+            Set<String> changed = null;
+            if (!SCOPE_ALL.equals(scope)) {
+                List<String> candidates = inputs.changeBaseCandidates(step.getBaseRef(), SCOPE_CHANGES.equals(scope));
+                base = inputs.resolveChangeBase(candidates);
+                if (base != null) {
+                    changed = inputs.changedFiles(base);
+                }
+                if (changed != null) {
+                    log.println("[ForgeAI] Scope: " + changed.size() + " file(s) changed relative to " + base + ".");
+                } else {
+                    base = null;
+                    if (!candidates.isEmpty() || SCOPE_CHANGES.equals(scope)) {
+                        log.println("[ForgeAI] WARNING: could not determine changed files"
+                                + (candidates.isEmpty() ? " (no pull request target, baseRef or previous build commit)"
+                                        : " relative to " + String.join(" / ", candidates))
+                                + " — analyzing all files matching sourceGlob."
+                                + " Fetch the target branch in your checkout, or set baseRef.");
+                    }
+                }
+            }
+
+            WorkspaceInputs.Sources sources = inputs.collect(step.getSourceGlob().split(","), changed,
+                    BaseAnalyzer.SOURCE_CHAR_LIMIT, cfg.getMaxSourceChunks(), "source");
+            String context = buildContext(inputs, env, step.getContextInfo(), base);
 
             List<AnalysisResult> results = new ArrayList<>();
-            List<String> failed = new ArrayList<>();
+            Set<String> failed = new LinkedHashSet<>();
             Map<String, BaseAnalyzer> registry = buildAnalyzerRegistry(llm, log, maxTokens);
 
             // Phase 1: gather each analyzer's input from the workspace (sequential I/O)
@@ -126,46 +170,68 @@ public class ForgeAIStep extends Step {
                     continue;
                 }
 
-                // Release readiness weighs the other results, so it runs after them
-                if ("release-readiness".equals(id)) {
-                    releaseReadiness = analyzer;
-                    continue;
-                }
-
                 try {
-                    String input = sourceCode;
-
-                    // Pipeline advisor gets the Jenkinsfile
-                    if ("pipeline-advisor".equals(id)) {
-                        input = readJenkinsfile(workspace, log);
-                    }
-
-                    // Dependency risk gets manifest files
-                    if ("dependency-risk".equals(id)) {
-                        input = collectManifests(workspace, log);
-                    }
-
-                    // Commit intelligence gets git history, not source files
-                    if ("commit-intel".equals(id)) {
-                        input = collectCommitHistory(workspace, launcher, env);
-                        if (input == null) {
-                            log.println("[ForgeAI/commit-intel] No git history available in the workspace — skipping.");
-                            continue;
+                    switch (id) {
+                        // Release readiness weighs the other results, so it runs after them
+                        case "release-readiness" -> releaseReadiness = analyzer;
+                        // Pipeline advisor gets the Jenkinsfile
+                        case "pipeline-advisor" -> jobs.add(new Job(id, analyzer, inputs.jenkinsfile(), context, 1, 1));
+                        // Dependency risk gets manifest files
+                        case "dependency-risk" -> jobs.add(new Job(id, analyzer, inputs.manifests(), context, 1, 1));
+                        // Commit intelligence gets git history, not source files
+                        case "commit-intel" -> {
+                            String history = inputs.commitHistory(base);
+                            if (history == null) {
+                                log.println("[ForgeAI/commit-intel] No git history available in the workspace — skipping.");
+                            } else {
+                                jobs.add(new Job(id, analyzer, history, context, 1, 1));
+                            }
+                        }
+                        // Everything else reads source, one request per chunk
+                        default -> {
+                            int parts = sources.chunks().size();
+                            if (parts == 0) {
+                                log.println("[ForgeAI/" + id + "] No source files to analyze — skipping.");
+                            }
+                            for (int i = 0; i < parts; i++) {
+                                String ctx = parts > 1
+                                        ? context + "\nThis request covers part " + (i + 1) + " of " + parts + " of the source."
+                                        : context;
+                                jobs.add(new Job(id, analyzer, sources.chunks().get(i), ctx, i + 1, parts));
+                            }
                         }
                     }
-                    jobs.add(new Job(id, analyzer, input, context));
-                } catch (Exception e) {
+                } catch (IOException e) {
                     log.println("[ForgeAI/" + id + "] ERROR: " + e.getMessage());
                     failed.add(id);
                 }
             }
 
-            // Phase 2: LLM calls, several at once
-            results.addAll(runJobs(jobs, cfg.effectiveParallelism(), log, failed));
+            // Phase 2: LLM calls, several at once; chunked analyzers are merged back into one result
+            List<AnalysisResult> raw = runJobs(jobs, cfg.effectiveParallelism(), log, failed);
+            Map<String, List<AnalysisResult>> byAnalyzer = new LinkedHashMap<>();
+            for (int i = 0; i < jobs.size(); i++) {
+                if (raw.get(i) != null) {
+                    byAnalyzer.computeIfAbsent(jobs.get(i).id(), k -> new ArrayList<>()).add(raw.get(i));
+                }
+            }
+            for (List<AnalysisResult> parts : byAnalyzer.values()) {
+                AnalysisResult merged = AnalysisResult.merge(parts);
+                if (parts.size() > 1) {
+                    log.printf("[ForgeAI/%s] Combined: %d/10 from %d parts | Findings: %d%n",
+                            merged.getAnalyzerId(), merged.getScore(), parts.size(), merged.getFindings().size());
+                }
+                results.add(merged);
+            }
+
             if (releaseReadiness != null) {
                 String ctx = results.isEmpty() ? context : serializeResults(results);
-                Job rr = new Job("release-readiness", releaseReadiness, sourceCode, ctx);
-                results.addAll(runJobs(List.of(rr), 1, log, failed));
+                String sample = sources.chunks().isEmpty() ? "" : sources.chunks().get(0);
+                Job rr = new Job("release-readiness", releaseReadiness, sample, ctx, 1, 1);
+                AnalysisResult verdict = runJobs(List.of(rr), 1, log, failed).get(0);
+                if (verdict != null) {
+                    results.add(verdict);
+                }
             }
 
             // ── Generate HTML Report ──
@@ -191,7 +257,10 @@ public class ForgeAIStep extends Step {
                     .mapToLong(r -> r.getFindings().size()).sum());
             output.put("criticalCount", results.stream()
                     .mapToLong(r -> r.countBySeverity("CRITICAL")).sum());
-            output.put("failedAnalyzers", failed);
+            output.put("failedAnalyzers", new ArrayList<>(failed));
+            output.put("analysisScope", changed != null ? SCOPE_CHANGES : SCOPE_ALL);
+            output.put("filesAnalyzed", sources.filesIncluded());
+            output.put("filesSkipped", sources.filesSkipped());
 
             for (AnalysisResult r : results) {
                 output.put(r.getAnalyzerId() + "Score", r.getScore());
@@ -233,19 +302,29 @@ public class ForgeAIStep extends Step {
             return output;
         }
 
-        /** One analyzer with the input it should analyze. */
-        private record Job(String id, BaseAnalyzer analyzer, String input, String context) {}
+        private static String normalizeScope(String scope) throws AbortException {
+            String s = scope == null || scope.isBlank() ? SCOPE_AUTO : scope.strip().toLowerCase(Locale.ROOT);
+            if (!Set.of(SCOPE_AUTO, SCOPE_CHANGES, SCOPE_ALL).contains(s)) {
+                throw new AbortException("[ForgeAI] Unknown scope '" + scope + "'. Use auto, changes or all.");
+            }
+            return s;
+        }
+
+        /** One LLM request: an analyzer with the input it should analyze (one chunk of it when {@code parts > 1}). */
+        private record Job(String id, BaseAnalyzer analyzer, String input, String context, int part, int parts) {}
 
         /**
-         * Runs the jobs with up to {@code parallelism} LLM requests in flight and returns their results
-         * in job order. Failures are logged and recorded in {@code failed}; parse failures still return a result.
+         * Runs the jobs with up to {@code parallelism} LLM requests in flight. The returned list lines up
+         * with {@code jobs}: a result, or {@code null} where the request failed. Failures are logged and
+         * recorded in {@code failed}; a response that could not be parsed still returns a result.
          */
-        private List<AnalysisResult> runJobs(List<Job> jobs, int parallelism, PrintStream log, List<String> failed)
+        private List<AnalysisResult> runJobs(List<Job> jobs, int parallelism, PrintStream log, Set<String> failed)
                 throws InterruptedException {
-            if (jobs.isEmpty()) return List.of();
+            List<AnalysisResult> out = new ArrayList<>();
+            if (jobs.isEmpty()) return out;
             int threads = Math.max(1, Math.min(parallelism, jobs.size()));
             if (threads > 1) {
-                log.println("\n[ForgeAI] Running " + jobs.size() + " analyzers, up to " + threads + " at a time.");
+                log.println("\n[ForgeAI] Running " + jobs.size() + " analysis requests, up to " + threads + " at a time.");
             }
             ExecutorService pool = Executors.newFixedThreadPool(threads,
                     new NamingThreadFactory(new DaemonThreadFactory(), "ForgeAI analyzer"));
@@ -254,7 +333,6 @@ public class ForgeAIStep extends Step {
                 for (Job job : jobs) {
                     futures.add(pool.submit(() -> runJob(job, log)));
                 }
-                List<AnalysisResult> out = new ArrayList<>();
                 for (int i = 0; i < jobs.size(); i++) {
                     String id = jobs.get(i).id();
                     try {
@@ -266,6 +344,7 @@ public class ForgeAIStep extends Step {
                     } catch (ExecutionException e) {
                         log.println("[ForgeAI/" + id + "] ERROR: " + e.getCause().getMessage());
                         failed.add(id);
+                        out.add(null);
                     }
                 }
                 return out;
@@ -275,147 +354,34 @@ public class ForgeAIStep extends Step {
         }
 
         private static AnalysisResult runJob(Job job, PrintStream log) throws LLMException {
-            log.println("\n━━━ Running: " + job.analyzer().analyzerName() + " ━━━");
+            String part = job.parts() > 1 ? " (part " + job.part() + " of " + job.parts() + ")" : "";
+            log.println("\n━━━ Running: " + job.analyzer().analyzerName() + part + " ━━━");
             long start = System.currentTimeMillis();
             AnalysisResult result = job.analyzer().analyze(job.input(), job.context());
             result.setDurationMs(System.currentTimeMillis() - start);
-            log.printf("[ForgeAI/%s] Score: %d/10 | Findings: %d | Time: %.1fs%n",
-                    job.id(), result.getScore(), result.getFindings().size(), result.getDurationMs() / 1000.0);
+            log.printf("[ForgeAI/%s]%s Score: %d/10 | Findings: %d | Time: %.1fs%n",
+                    job.id(), part, result.getScore(), result.getFindings().size(), result.getDurationMs() / 1000.0);
             return result;
         }
 
-        // ── Helper: collect source files matching glob ────────────────
-        private String collectSources(FilePath workspace, String glob, PrintStream log) throws Exception {
-            return collectFiles(workspace, glob.split(","), BaseAnalyzer.SOURCE_CHAR_LIMIT, "source", log);
-        }
-
-        /**
-         * Concatenates whole files matching the given patterns, stopping at {@code budget} characters
-         * so the analyzer sees every file it is given instead of silently truncating the middle.
-         * Files that do not fit are skipped and reported in the build log.
-         */
-        private String collectFiles(FilePath workspace, String[] patterns, int budget, String kind,
-                                    PrintStream log) throws Exception {
-            StringBuilder sb = new StringBuilder();
-            Set<String> seen = new HashSet<>();
-            List<String> skipped = new ArrayList<>();
-            int included = 0;
-            for (String g : patterns) {
-                String pattern = g.strip();
-                if (pattern.isEmpty()) continue;
-                for (FilePath file : workspace.list(pattern)) {
-                    if (!seen.add(file.getRemote())) continue;
-                    String rel = relativePath(workspace, file);
-                    String header = "\n=== FILE: " + rel + " ===\n";
-                    // length() is in bytes: an upper bound on chars that avoids reading files that cannot fit
-                    if (sb.length() + header.length() + file.length() > budget) {
-                        skipped.add(rel);
-                        continue;
-                    }
-                    sb.append(header).append(file.readToString());
-                    included++;
-                }
-            }
-            log.println("[ForgeAI] Included " + included + " " + kind + " file(s) in the analysis.");
-            if (!skipped.isEmpty()) {
-                log.println("[ForgeAI] WARNING: " + skipped.size() + " " + kind + " file(s) exceeded the "
-                        + budget + "-character analysis budget and were NOT analyzed: "
-                        + String.join(", ", skipped.subList(0, Math.min(10, skipped.size())))
-                        + (skipped.size() > 10 ? ", ..." : "")
-                        + ". Narrow the glob to the files that matter.");
-            }
-            return sb.toString();
-        }
-
-        private static String relativePath(FilePath workspace, FilePath file) {
-            String ws = workspace.getRemote();
-            String path = file.getRemote();
-            return path.startsWith(ws) ? path.substring(ws.length()).replaceFirst("^[/\\\\]+", "") : path;
-        }
-
-        // ── Helper: collect git history for commit intelligence ───────
-        /** Returns recent commits plus the HEAD diff, or {@code null} when git history is unavailable. */
-        private String collectCommitHistory(FilePath workspace, Launcher launcher, EnvVars env)
-                throws InterruptedException {
-            String commits = runGit(workspace, launcher, env, "log", "-n", "20", "--stat", "--no-color");
-            if (commits == null || commits.isBlank()) return null;
-
-            StringBuilder sb = new StringBuilder("=== RECENT COMMITS ===\n").append(commits.strip());
-            String diff = runGit(workspace, launcher, env, "show", "--no-color", "--format=", "HEAD");
-            if (diff != null && !diff.isBlank()) {
-                // Cut the diff rather than letting head/tail truncation drop the commit messages
-                int room = CommitIntelligenceAnalyzer.COMMIT_CHAR_LIMIT - sb.length() - 100;
-                if (room > 0) {
-                    String d = diff.strip();
-                    sb.append("\n\n=== DIFF OF HEAD COMMIT ===\n")
-                            .append(d.length() > room ? d.substring(0, room) + "\n... [diff truncated]" : d);
-                }
-            }
-            return sb.toString();
-        }
-
-        private String runGit(FilePath workspace, Launcher launcher, EnvVars env, String... args)
-                throws InterruptedException {
-            List<String> cmd = new ArrayList<>();
-            cmd.add("git");
-            cmd.addAll(Arrays.asList(args));
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            try {
-                int rc = launcher.launch().cmds(cmd).envs(env).pwd(workspace).quiet(true)
-                        .stdout(out).stderr(OutputStream.nullOutputStream()).join();
-                return rc == 0 ? out.toString(StandardCharsets.UTF_8) : null;
-            } catch (IOException e) {
-                return null; // git not installed on the agent
-            }
-        }
-
         // ── Helper: build context string ──────────────────────────────
-        private String buildContext(FilePath workspace, EnvVars env,
-                                    String extra, PrintStream log) throws Exception {
+        private String buildContext(WorkspaceInputs inputs, EnvVars env, String extra, String changeBase) {
             StringBuilder ctx = new StringBuilder();
             ctx.append("Project: ").append(env.getOrDefault("JOB_NAME", "unknown")).append("\n");
             ctx.append("Branch: ").append(env.getOrDefault("GIT_BRANCH", "unknown")).append("\n");
             ctx.append("Build: #").append(env.getOrDefault("BUILD_NUMBER", "0")).append("\n");
 
             // Detect language from files present
-            ctx.append("Files in workspace: ");
-            try {
-                String tree = workspace.act(new DirectoryTreeCallable());
-                ctx.append(tree);
-            } catch (Exception e) {
-                ctx.append("(could not list)");
-            }
+            ctx.append("Files in workspace: ").append(inputs.directoryTree());
 
+            if (changeBase != null) {
+                ctx.append("\n\nAnalysis scope: only files changed relative to ").append(changeBase)
+                        .append(" are included, so the code below is a partial view of the project.");
+            }
             if (extra != null && !extra.isBlank()) {
                 ctx.append("\n\nAdditional context: ").append(extra);
             }
             return ctx.toString();
-        }
-
-        // ── Helper: read Jenkinsfile ──────────────────────────────────
-        private String readJenkinsfile(FilePath workspace, PrintStream log) {
-            try {
-                FilePath jf = new FilePath(workspace, "Jenkinsfile");
-                if (jf.exists()) return jf.readToString();
-                // Try .jenkins/Jenkinsfile
-                jf = new FilePath(workspace, ".jenkins/Jenkinsfile");
-                if (jf.exists()) return jf.readToString();
-            } catch (Exception e) {
-                log.println("[ForgeAI] Could not read Jenkinsfile: " + e.getMessage());
-            }
-            return "(Jenkinsfile not found in workspace)";
-        }
-
-        // ── Helper: collect dependency manifests ──────────────────────
-        private String collectManifests(FilePath workspace, PrintStream log) throws Exception {
-            String[] manifestGlobs = {
-                    "**/pom.xml", "**/build.gradle", "**/build.gradle.kts",
-                    "**/package.json", "**/requirements.txt", "**/Pipfile",
-                    "**/go.mod", "**/Cargo.toml", "**/Gemfile", "**/composer.json"
-            };
-            String manifests = collectFiles(workspace, manifestGlobs,
-                    DependencyRiskAnalyzer.MANIFEST_CHAR_LIMIT, "manifest", log);
-            return manifests.isEmpty() ? "(No dependency manifests found)" : manifests;
         }
 
         // ── Helper: serialize prior results for release-readiness ─────

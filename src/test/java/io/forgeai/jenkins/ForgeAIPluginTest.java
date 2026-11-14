@@ -112,6 +112,32 @@ class ForgeAIPluginTest {
     }
 
     @Test
+    void testAnalysisResult_mergeCombinesChunks() {
+        AnalysisResult a = new AnalysisResult("code-review", "AI Code Review");
+        a.setScore(9);
+        a.setSeverity("LOW");
+        a.setSummary("Clean.");
+        a.addFinding(new AnalysisResult.Finding("A1", "LOW", "desc"));
+        AnalysisResult b = new AnalysisResult("code-review", "AI Code Review");
+        b.setScore(4);
+        b.setSeverity("HIGH");
+        b.setSummary("Problems.");
+        b.addFinding(new AnalysisResult.Finding("B1", "HIGH", "desc"));
+        b.addFinding(new AnalysisResult.Finding("B2", "MEDIUM", "desc"));
+        b.setParseFailed(true);
+
+        AnalysisResult merged = AnalysisResult.merge(List.of(a, b));
+
+        assertEquals("code-review", merged.getAnalyzerId());
+        assertEquals(7, merged.getScore(), "average of 9 and 4, rounded");
+        assertEquals("HIGH", merged.getSeverity(), "worst severity wins");
+        assertEquals(3, merged.getFindings().size());
+        assertEquals("Part 1: Clean. Part 2: Problems.", merged.getSummary());
+        assertTrue(merged.isParseFailed(), "a failed part marks the whole result");
+        assertSame(a, AnalysisResult.merge(List.of(a)), "a single part is returned as is");
+    }
+
+    @Test
     void testAnalysisResult_scoreClamp() {
         AnalysisResult r = new AnalysisResult("test", "Test");
         r.setScore(15);

@@ -60,6 +60,39 @@ public class AnalysisResult implements Serializable {
     // ── Convenience ────────────────────────────────────────────────────
     public void addFinding(Finding f) { findings.add(f); }
 
+    private static final List<String> SEVERITY_ORDER = List.of("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO");
+
+    /**
+     * Combines the results of one analyzer that ran over several chunks of input: the score is the
+     * rounded average, the severity is the worst seen, and all findings are kept.
+     */
+    public static AnalysisResult merge(List<AnalysisResult> parts) {
+        if (parts.size() == 1) return parts.get(0);
+        AnalysisResult first = parts.get(0);
+        AnalysisResult merged = new AnalysisResult(first.getAnalyzerId(), first.getAnalyzerName());
+        merged.setScore((int) Math.round(parts.stream().mapToInt(AnalysisResult::getScore).average().orElse(5)));
+        int worst = SEVERITY_ORDER.size() - 1;
+        StringBuilder summary = new StringBuilder();
+        StringBuilder raw = new StringBuilder();
+        long duration = 0;
+        for (int i = 0; i < parts.size(); i++) {
+            AnalysisResult part = parts.get(i);
+            int rank = SEVERITY_ORDER.indexOf(part.getSeverity());
+            if (rank >= 0 && rank < worst) worst = rank;
+            if (summary.length() > 0) summary.append(' ');
+            summary.append("Part ").append(i + 1).append(": ").append(part.getSummary());
+            if (part.getRawMarkdown() != null) raw.append(part.getRawMarkdown()).append("\n\n");
+            part.getFindings().forEach(merged::addFinding);
+            duration += part.getDurationMs();
+            if (part.isParseFailed()) merged.setParseFailed(true);
+        }
+        merged.setSeverity(SEVERITY_ORDER.get(worst));
+        merged.setSummary(summary.toString());
+        merged.setRawMarkdown(raw.toString());
+        merged.setDurationMs(duration);
+        return merged;
+    }
+
     public long countBySeverity(String sev) {
         return findings.stream().filter(f -> sev.equalsIgnoreCase(f.getSeverity())).count();
     }

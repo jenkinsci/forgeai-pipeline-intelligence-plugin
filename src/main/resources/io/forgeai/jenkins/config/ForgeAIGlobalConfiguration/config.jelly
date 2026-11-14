@@ -22,6 +22,11 @@
       <f:number clazz="setting-input" min="256" default="4096"/>
     </f:entry>
 
+    <f:entry title="Max Source Chunks per Analyzer" field="maxSourceChunks"
+             description="When the source to analyze does not fit in one LLM request (60,000 characters), it is split across up to this many requests per analyzer and the results are merged. Files beyond that are skipped and listed in the build log. Higher values cover more code and cost more.">
+      <f:number clazz="setting-input" min="1" default="4"/>
+    </f:entry>
+
     <f:entry title="Parallel LLM Requests" field="maxParallelRequests"
              description="How many analyzers call the LLM at once. 0 = automatic: 4 for cloud providers, 1 for Ollama. Lower it if your provider rate-limits you.">
       <f:number clazz="setting-input" min="0" default="0"/>

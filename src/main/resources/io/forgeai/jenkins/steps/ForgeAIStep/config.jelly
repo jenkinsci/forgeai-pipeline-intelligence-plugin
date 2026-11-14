@@ -11,6 +11,20 @@
     <f:textbox default="**/*.java,**/*.py,**/*.js,**/*.ts"/>
   </f:entry>
 
+  <f:entry title="Scope" field="scope"
+           description="Which files the code analyzers read. Automatic analyzes only changed files on pull request builds.">
+    <select name="scope" class="jenkins-select__input">
+      <f:option value="auto" selected="${instance == null or instance.scope == 'auto'}">Automatic: changed files on pull requests, all files otherwise</f:option>
+      <f:option value="changes" selected="${instance.scope == 'changes'}">Only files changed since the base revision</f:option>
+      <f:option value="all" selected="${instance.scope == 'all'}">All files matching the glob</f:option>
+    </select>
+  </f:entry>
+
+  <f:entry title="Base Revision" field="baseRef"
+           description="Optional branch, tag or commit to compare against, e.g. origin/main. Defaults to the pull request's target branch.">
+    <f:textbox/>
+  </f:entry>
+
   <f:entry title="Additional Context" field="contextInfo"
            description="Optional project description, architecture info, or constraints">
     <f:textarea/>
