@@ -222,6 +222,8 @@ Model ID:  deepseek-coder:6.7b
 API Key:   (leave blank)
 ```
 
+> ForgeAI sends LLM requests from the **Jenkins controller**, not from the agent running the build. The endpoint must be reachable from the controller; `localhost` means the controller's own machine.
+
 ### LM Studio
 
 1. Download from [lmstudio.ai](https://lmstudio.ai)
