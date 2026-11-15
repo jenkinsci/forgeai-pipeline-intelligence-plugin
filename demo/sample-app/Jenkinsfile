@@ -6,9 +6,13 @@ pipeline {
             steps {
                 deleteDir()
                 // The demo copies a bundled sample instead of cloning, and commits it so
-                // commit-intel has history to read.
+                // commit-intel has history to read. The sample's deliberately outdated
+                // dependencies are stored as python-deps.txt so that dependency scanners
+                // watching the plugin's repository ignore them; here they become the
+                // requirements.txt that ForgeAI analyzes.
                 sh '''
                     cp -r /demo-app/. .
+                    mv python-deps.txt requirements.txt
                     git init -q -b main
                     git add .
                     git -c user.name="Demo Developer" -c user.email=dev@example.com \
@@ -28,6 +32,9 @@ pipeline {
                     )
                     def score = Math.round(report.compositeScore * 10) / 10
                     echo "Composite score: ${score}/10, findings: ${report.totalFindings}"
+
+                    // Show the findings on the build page, anchored to the source lines.
+                    recordIssues tool: sarif(pattern: report.sarifFile, id: 'forgeai', name: 'ForgeAI')
                 }
             }
         }

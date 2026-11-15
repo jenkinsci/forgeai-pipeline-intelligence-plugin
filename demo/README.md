@@ -16,16 +16,19 @@ When it's ready:
 
 1. Open http://localhost:8080 and sign in as `admin` with password `forgeai`.
 2. Open the **forgeai-demo** job and click **Build Now**.
-3. When the build finishes, open **ForgeAI Report** on the build page, or read the scores in the
-   console output.
+3. When the build finishes, open **ForgeAI Report** on the build page for the scores and the full
+   report, and **ForgeAI** for the findings shown against the source code. The scores are also in
+   the console output.
 
 On CPU, a full run of seven analyzers takes about four minutes.
 
 ## What it shows
 
 The job copies [`sample-app/`](sample-app), a small Flask payments service, into the workspace,
-commits it so `commit-intel` has history to read, and runs `forgeAI` with seven analyzers. The sample
-has real problems for ForgeAI to find:
+commits it so `commit-intel` has history to read, and runs `forgeAI` with seven analyzers. It then
+passes the SARIF file that ForgeAI writes to the
+[Warnings NG](https://plugins.jenkins.io/warnings-ng/) plugin, which lists each finding with its file
+and line. The sample has real problems for ForgeAI to find:
 
 - SQL built by string concatenation, and a shell command built from a URL parameter
 - a hard-coded admin token, and refunds with no amount validation
@@ -70,6 +73,9 @@ OLLAMA_MODEL=qwen2.5-coder:7b docker compose up -d --build
 ## Notes
 
 - Jenkins listens on `127.0.0.1` only. This setup is for trying ForgeAI, not for production.
+- The sample's outdated dependencies are in `sample-app/python-deps.txt`, not `requirements.txt`, so
+  that dependency scanners watching this repository don't report them. The job renames the file
+  before the analysis.
 - The report uses an inline stylesheet, which Jenkins' default Content-Security-Policy blocks for
   archived files. [`report-csp.groovy`](jenkins/init.groovy.d/report-csp.groovy) allows inline styles
   (scripts stay blocked) so the report renders.
