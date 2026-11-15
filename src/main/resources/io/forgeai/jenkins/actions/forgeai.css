@@ -116,7 +116,7 @@
 .forgeai-chart__grid { stroke: rgba(128, 128, 128, 0.22); stroke-width: 1; }
 .forgeai-chart__axis {
   fill: var(--text-color-secondary, #6b7280);
-  font-size: 10px;
+  font-size: 12px;
 }
 .forgeai-chart__gate {
   stroke: var(--red, #e6001f);

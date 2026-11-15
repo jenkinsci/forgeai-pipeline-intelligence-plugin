@@ -100,7 +100,9 @@ public class ForgeAIJobAction implements Action {
         public long getFindings() { return action.getTotalFindings(); }
         public long getCritical() { return action.getCriticalCount(); }
         public String getGateStatus() { return action.getGateStatus(); }
-        public String getScope() { return action.getAnalysisScope(); }
+        public String getScope() {
+            return "changes".equals(action.getAnalysisScope()) ? "Changed files" : "All files";
+        }
         public int getX() { return x; }
         public int getY() { return y; }
     }

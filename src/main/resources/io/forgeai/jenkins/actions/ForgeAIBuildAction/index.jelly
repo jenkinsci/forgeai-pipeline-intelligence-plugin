@@ -28,7 +28,8 @@
 
       <j:if test="${!empty(it.failedAnalyzers)}">
         <p class="jenkins-alert jenkins-alert-warning">
-          These analyzers did not produce a result, so they are not in the score: ${it.failedAnalyzersText}.
+          These analyzers failed or returned a response that could not be parsed: ${it.failedAnalyzersText}.
+          When the quality gate is on, this fails the build.
         </p>
       </j:if>
 

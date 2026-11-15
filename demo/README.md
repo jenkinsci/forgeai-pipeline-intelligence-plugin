@@ -16,9 +16,9 @@ When it's ready:
 
 1. Open http://localhost:8080 and sign in as `admin` with password `forgeai`.
 2. Open the **forgeai-demo** job and click **Build Now**.
-3. When the build finishes, open **ForgeAI Report** on the build page for the scores and the full
-   report, and **ForgeAI** for the findings shown against the source code. The scores are also in
-   the console output.
+3. When the build finishes, open **ForgeAI Analysis** on the build page for the scores, verdict and
+   findings, and **ForgeAI Warnings** for the findings shown against the source code. After a few
+   builds, the job page shows the score trend.
 
 On CPU, a full run of seven analyzers takes about four minutes.
 
