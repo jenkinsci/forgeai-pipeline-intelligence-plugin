@@ -1,0 +1,10 @@
+<?jelly escape-by-default='true'?>
+<!-- Shown on the job page. -->
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler">
+  <st:adjunct includes="io.forgeai.jenkins.actions.forgeai"/>
+  <div class="forgeai-trend-box">
+    <h2 class="forgeai-trend-box__title">ForgeAI score trend</h2>
+    <st:include page="chart.jelly"/>
+    <a href="${rootURL}/${it.job.url}${it.urlName}/">All ForgeAI results</a>
+  </div>
+</j:jelly>

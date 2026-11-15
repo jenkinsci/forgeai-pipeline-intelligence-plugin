@@ -383,6 +383,16 @@ NOTE: ForgeAI sends LLM requests from the *Jenkins controller*, not from the age
 . Start the local server (default: `http://localhost:1234`)
 . In Jenkins, select *OpenAI / OpenAI-Compatible*, set endpoint to `http://localhost:1234/`, and leave API Key blank
 
+== Build Page and Score Trend
+
+Each build that runs `forgeAI` gets a *ForgeAI Analysis* page, linked from the build's sidebar and summarized on the build page. It shows the composite score, the verdict, each analyzer's score and summary, and every finding with its location and suggested fix. Jenkins renders the page itself, so it needs no extra plugin and follows the Jenkins theme.
+
+The job page shows a *ForgeAI score trend*: the composite score of the last 30 builds that ran ForgeAI, with the quality-gate threshold when the gate is on. Select a point to open that build's analysis, or *ForgeAI Trend* in the sidebar for a table of the same builds.
+
+* A build that fails the quality gate keeps its analysis, so you can see why it failed.
+* When a build runs `forgeAI` more than once, the page shows the last run.
+* The page stores scores and findings with the build. The raw model responses are left out; they are in the HTML report.
+
 == HTML Report
 
 Every build generates a self-contained HTML report with:

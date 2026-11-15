@@ -9,6 +9,7 @@ import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.util.DaemonThreadFactory;
 import hudson.util.NamingThreadFactory;
+import io.forgeai.jenkins.actions.ForgeAIBuildAction;
 import io.forgeai.jenkins.analyzers.*;
 import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
 import io.forgeai.jenkins.llm.LLMException;
@@ -289,13 +290,20 @@ public class ForgeAIStep extends Step {
                         + String.join(", ", failed));
             }
 
-            // ── Fail build if threshold not met ──
             Boolean stepFail = step.getFailOnCritical();
             Integer stepThreshold = step.getCriticalThreshold();
             boolean shouldFail = stepFail != null ? stepFail : cfg.isFailOnCritical();
             int threshold = stepThreshold != null && stepThreshold > 0
                     ? stepThreshold : cfg.getCriticalThreshold();
 
+            // ── Keep the analysis with the build, before the gate can fail it ──
+            if (!results.isEmpty() || !failed.isEmpty()) {
+                build.addOrReplaceAction(new ForgeAIBuildAction(results, new ArrayList<>(failed),
+                        changed != null ? SCOPE_CHANGES : SCOPE_ALL, sources.filesIncluded(), sources.filesSkipped(),
+                        shouldFail, threshold));
+            }
+
+            // ── Fail build if threshold not met ──
             if (shouldFail) {
                 // A gate that could not evaluate everything it was asked to must not pass.
                 if (!failed.isEmpty()) {
