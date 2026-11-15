@@ -42,6 +42,11 @@ public class ForgeAIJobAction implements Action {
 
     public Job<?, ?> getJob() { return job; }
 
+    /** For views rendered with the job as context, such as the job page's floating box. */
+    public static ForgeAIJobAction of(Job<?, ?> job) {
+        return new ForgeAIJobAction(job);
+    }
+
     /** The most recent builds that ran ForgeAI, oldest first. Looks at no more than the last 100 builds. */
     public List<Point> getTrend() {
         List<Point> points = new ArrayList<>();
