@@ -1,0 +1,91 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:l="/lib/layout">
+  <l:layout title="${it.run.fullDisplayName} · ForgeAI">
+    <st:include it="${it.run}" page="sidepanel.jelly"/>
+    <l:main-panel>
+      <st:adjunct includes="io.forgeai.jenkins.actions.forgeai"/>
+      <h1>ForgeAI analysis</h1>
+
+      <div class="forgeai-kpis">
+        <div class="forgeai-kpi">
+          <span class="forgeai-kpi__label">Composite score</span>
+          <span class="forgeai-kpi__value">${it.compositeScoreText}<small> / 10</small></span>
+        </div>
+        <div class="forgeai-kpi">
+          <span class="forgeai-kpi__label">Verdict</span>
+          <span class="forgeai-kpi__value forgeai-${it.verdictKey}">${it.verdict}</span>
+        </div>
+        <div class="forgeai-kpi">
+          <span class="forgeai-kpi__label">Findings</span>
+          <span class="forgeai-kpi__value">${it.totalFindings}</span>
+        </div>
+        <div class="forgeai-kpi">
+          <span class="forgeai-kpi__label">Critical / high</span>
+          <span class="forgeai-kpi__value">${it.criticalCount} / ${it.highCount}</span>
+        </div>
+      </div>
+      <p class="forgeai-meta">${it.scopeText}. ${it.gateText}.</p>
+
+      <j:if test="${!empty(it.failedAnalyzers)}">
+        <p class="jenkins-alert jenkins-alert-warning">
+          These analyzers failed or returned a response that could not be parsed: ${it.failedAnalyzersText}.
+          When the quality gate is on, this fails the build.
+        </p>
+      </j:if>
+
+      <j:if test="${it.scored}">
+        <h2>Analyzers</h2>
+        <table class="jenkins-table">
+          <thead>
+            <tr><th>Analyzer</th><th>Score</th><th>Severity</th><th>Findings</th><th>Summary</th></tr>
+          </thead>
+          <tbody>
+            <j:forEach var="row" items="${it.analyzerRows}">
+              <tr>
+                <td>${row.name}</td>
+                <td class="forgeai-nowrap">
+                  ${row.score}/10
+                  <svg xmlns="http://www.w3.org/2000/svg" class="forgeai-bar" viewBox="0 0 100 6"
+                       preserveAspectRatio="none" aria-hidden="true">
+                    <rect class="forgeai-bar__track" width="100" height="6" rx="3"/>
+                    <rect class="forgeai-fill-${row.band}" width="${row.barWidth}" height="6" rx="3"/>
+                  </svg>
+                </td>
+                <td><span class="forgeai-sev forgeai-sev--${row.severityKey}">${row.severity}</span></td>
+                <td>${row.findingCount}</td>
+                <td>
+                  ${row.summary}
+                  <j:if test="${row.parseFailed}"> (The response could not be parsed.)</j:if>
+                </td>
+              </tr>
+            </j:forEach>
+          </tbody>
+        </table>
+
+        <h2>Findings</h2>
+        <j:set var="findings" value="${it.findingRows}"/>
+        <j:choose>
+          <j:when test="${empty(findings)}">
+            <p>No findings.</p>
+          </j:when>
+          <j:otherwise>
+            <j:forEach var="f" items="${findings}">
+              <div class="forgeai-finding forgeai-finding--${f.severityKey}">
+                <span class="forgeai-sev forgeai-sev--${f.severityKey}">${f.severity}</span>
+                <span class="forgeai-finding__analyzer">${f.analyzerName}</span>
+                <h3>${f.title}</h3>
+                <j:if test="${!empty(f.location)}">
+                  <div class="forgeai-finding__where">${f.location}</div>
+                </j:if>
+                <p>${f.description}</p>
+                <j:if test="${!empty(f.suggestion)}">
+                  <p><strong>Suggested fix:</strong> ${f.suggestion}</p>
+                </j:if>
+              </div>
+            </j:forEach>
+          </j:otherwise>
+        </j:choose>
+      </j:if>
+    </l:main-panel>
+  </l:layout>
+</j:jelly>

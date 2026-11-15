@@ -1,0 +1,13 @@
+<?jelly escape-by-default='true'?>
+<!-- Shown on the job page. Jenkins renders it with the job, not this action, as "it". -->
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler">
+  <j:invokeStatic var="forgeai" className="io.forgeai.jenkins.actions.ForgeAIJobAction" method="of">
+    <j:arg type="hudson.model.Job" value="${it}"/>
+  </j:invokeStatic>
+  <st:adjunct includes="io.forgeai.jenkins.actions.forgeai"/>
+  <div class="forgeai-trend-box">
+    <h2 class="forgeai-trend-box__title">ForgeAI score trend</h2>
+    <st:include page="chart.jelly" it="${forgeai}"/>
+    <a href="${rootURL}/${it.url}${forgeai.urlName}/">All ForgeAI results</a>
+  </div>
+</j:jelly>

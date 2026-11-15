@@ -17,6 +17,7 @@
 - [Quick Start](#quick-start)
 - [Pipeline DSL Reference](#pipeline-dsl-reference)
 - [Air-Gapped / Local LLM Setup](#air-gapped--local-llm-setup)
+- [Build Page and Score Trend](#build-page-and-score-trend)
 - [HTML Report](#html-report)
 - [Configuration Reference](#configuration-reference)
 - [Building from Source](#building-from-source)
@@ -261,6 +262,18 @@ API Key:   (leave blank)
 
 ---
 
+## Build Page and Score Trend
+
+Each build that runs `forgeAI` gets a **ForgeAI Analysis** page, linked from the build's sidebar and summarized on the build page. It shows the composite score, the verdict, each analyzer's score and summary, and every finding with its location and suggested fix. Jenkins renders the page itself, so it needs no extra plugin and follows the Jenkins theme.
+
+The job page shows a **ForgeAI score trend**: the composite score of the last 30 builds that ran ForgeAI, with the quality-gate threshold when the gate is on. Select a point to open that build's analysis, or **ForgeAI Trend** in the sidebar for a table of the same builds.
+
+* A build that fails the quality gate keeps its analysis, so you can see why it failed.
+* When a build runs `forgeAI` more than once, the page shows the last run.
+* The page stores scores and findings with the build. The raw model responses are left out; they are in the HTML report.
+
+---
+
 ## HTML Report
 
 Every build generates a self-contained HTML report with:
@@ -386,10 +399,15 @@ forgeai-pipeline-intelligence/
 │   │   ├── steps/
 │   │   │   ├── ForgeAIStep.java                   # forgeAI pipeline step
 │   │   │   ├── ForgeAIScanStep.java               # forgeAIScan pipeline step
+│   │   │   ├── WorkspaceInputs.java               # Sources, manifests, git history, change scope
 │   │   │   └── DirectoryTreeCallable.java
+│   │   ├── actions/
+│   │   │   ├── ForgeAIBuildAction.java            # ForgeAI Analysis page of a build
+│   │   │   └── ForgeAIJobAction.java              # Score trend on the job page
 │   │   └── reports/
 │   │       ├── AnalysisResult.java
-│   │       └── ForgeAIReportGenerator.java
+│   │       ├── ForgeAIReportGenerator.java        # HTML report
+│   │       └── ForgeAISarifGenerator.java         # SARIF 2.1.0
 │   ├── main/resources/
 │   │   ├── index.jelly
 │   │   └── io/forgeai/jenkins/
@@ -404,7 +422,7 @@ forgeai-pipeline-intelligence/
 ├── .github/workflows/ci.yml        # GitHub Actions (Java 17 + 21 matrix)
 ├── LOCAL_TESTING.md
 ├── CONTRIBUTING.md
-└── LICENSE                         # Apache 2.0
+└── LICENSE                         # MIT
 ```
 
 ---
@@ -425,7 +443,8 @@ forgeai-pipeline-intelligence/
 
 - [ ] GitHub Checks API — post findings as PR annotations
 - [ ] SonarQube integration — augment AI analysis with static analysis data
-- [ ] Historical trend dashboard — track scores across builds
+- [x] Score trend across builds, on the job page
+- [x] SARIF output for Warnings NG and GitHub code scanning
 - [ ] Slack / Teams notifications with score summaries
 - [ ] Multi-language prompt tuning — model-specific prompt optimisation
 - [ ] Custom analyzer support — define your own analyzer prompts via the UI

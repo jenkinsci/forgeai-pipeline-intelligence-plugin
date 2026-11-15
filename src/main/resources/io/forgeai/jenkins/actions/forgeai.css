@@ -1,0 +1,135 @@
+/* ForgeAI build page and trend chart. Colours come from Jenkins' theme variables, with fallbacks. */
+
+.forgeai-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.forgeai-kpi {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border-color, rgba(128, 128, 128, 0.3));
+  background: var(--card-background, transparent);
+}
+.forgeai-kpi__label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-color-secondary, #6b7280);
+}
+.forgeai-kpi__value {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.forgeai-kpi__value small {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-color-secondary, #6b7280);
+}
+.forgeai-meta {
+  margin: 0 0 20px;
+  color: var(--text-color-secondary, #6b7280);
+}
+
+/* Verdict bands */
+.forgeai-ship { color: var(--green, #1ea446); }
+.forgeai-caution { color: var(--yellow, #b58105); }
+.forgeai-hold { color: var(--orange, #e8690b); }
+.forgeai-block { color: var(--red, #e6001f); }
+.forgeai-none { color: var(--text-color-secondary, #6b7280); }
+
+.forgeai-fill-ship { fill: var(--green, #1ea446); }
+.forgeai-fill-caution { fill: var(--yellow, #b58105); }
+.forgeai-fill-hold { fill: var(--orange, #e8690b); }
+.forgeai-fill-block { fill: var(--red, #e6001f); }
+
+/* Analyzer table */
+.forgeai-nowrap { white-space: nowrap; }
+.forgeai-bar {
+  width: 96px;
+  height: 6px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.forgeai-bar__track { fill: rgba(128, 128, 128, 0.25); }
+
+/* Severity */
+.forgeai-sev {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.forgeai-sev--critical { color: var(--red, #e6001f); }
+.forgeai-sev--high { color: var(--orange, #e8690b); }
+.forgeai-sev--medium { color: var(--yellow, #b58105); }
+.forgeai-sev--low { color: var(--green, #1ea446); }
+.forgeai-sev--info { color: var(--blue, #1f6feb); }
+
+/* Findings */
+.forgeai-finding {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--card-border-color, rgba(128, 128, 128, 0.3));
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: var(--card-background, transparent);
+}
+.forgeai-finding--critical { border-left-color: var(--red, #e6001f); }
+.forgeai-finding--high { border-left-color: var(--orange, #e8690b); }
+.forgeai-finding--medium { border-left-color: var(--yellow, #b58105); }
+.forgeai-finding--low { border-left-color: var(--green, #1ea446); }
+.forgeai-finding--info { border-left-color: var(--blue, #1f6feb); }
+.forgeai-finding h3 {
+  margin: 6px 0 4px;
+  font-size: 1rem;
+}
+.forgeai-finding p { margin: 4px 0; }
+.forgeai-finding__analyzer {
+  margin-left: 6px;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary, #6b7280);
+}
+.forgeai-finding__where {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.82rem;
+  color: var(--text-color-secondary, #6b7280);
+}
+
+/* Trend chart */
+.forgeai-trend-box { max-width: 520px; }
+.forgeai-trend-box__title { margin: 0 0 6px; font-size: 1.1rem; }
+.forgeai-chart {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  margin: 0 0 8px;
+}
+.forgeai-chart__grid { stroke: rgba(128, 128, 128, 0.22); stroke-width: 1; }
+.forgeai-chart__axis {
+  fill: var(--text-color-secondary, #6b7280);
+  font-size: 12px;
+}
+.forgeai-chart__gate {
+  stroke: var(--red, #e6001f);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+.forgeai-chart__line {
+  fill: none;
+  stroke: var(--orange, #e8690b);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.forgeai-chart__dot {
+  stroke: var(--background, #fff);
+  stroke-width: 1.5;
+}

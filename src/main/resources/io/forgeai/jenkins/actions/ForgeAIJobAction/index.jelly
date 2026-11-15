@@ -1,0 +1,40 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:l="/lib/layout">
+  <l:layout title="${it.job.fullDisplayName} · ForgeAI trend">
+    <st:include it="${it.job}" page="sidepanel.jelly"/>
+    <l:main-panel>
+      <st:adjunct includes="io.forgeai.jenkins.actions.forgeai"/>
+      <h1>ForgeAI trend</h1>
+      <j:set var="history" value="${it.history}"/>
+      <j:choose>
+        <j:when test="${empty(history)}">
+          <p>No recent build has a ForgeAI score.</p>
+        </j:when>
+        <j:otherwise>
+          <st:include page="chart.jelly"/>
+          <table class="jenkins-table">
+            <thead>
+              <tr>
+                <th>Build</th><th>Score</th><th>Verdict</th><th>Findings</th><th>Critical</th>
+                <th>Scope</th><th>Quality gate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <j:forEach var="p" items="${history}">
+                <tr>
+                  <td><a href="${rootURL}/${p.url}">${p.displayName}</a></td>
+                  <td>${p.scoreText}</td>
+                  <td><span class="forgeai-${p.band}">${p.verdict}</span></td>
+                  <td>${p.findings}</td>
+                  <td>${p.critical}</td>
+                  <td>${p.scope}</td>
+                  <td>${p.gateStatus}</td>
+                </tr>
+              </j:forEach>
+            </tbody>
+          </table>
+        </j:otherwise>
+      </j:choose>
+    </l:main-panel>
+  </l:layout>
+</j:jelly>

@@ -2,6 +2,8 @@ package io.forgeai.jenkins;
 
 import hudson.FilePath;
 import hudson.model.Result;
+import io.forgeai.jenkins.actions.ForgeAIBuildAction;
+import io.forgeai.jenkins.actions.ForgeAIJobAction;
 import io.forgeai.jenkins.config.ForgeAIGlobalConfiguration;
 import io.forgeai.jenkins.llm.LLMException;
 import io.forgeai.jenkins.llm.LLMProvider;
@@ -18,6 +20,7 @@ import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 import java.io.File;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -32,6 +35,9 @@ class ForgeAIStepTest {
 
     private static final String LOW_SCORE = "{\"score\":2,\"severity\":\"HIGH\",\"summary\":\"Poor.\",\"findings\":[]}";
     private static final String HIGH_SCORE = "{\"score\":9,\"severity\":\"LOW\",\"summary\":\"Good.\",\"findings\":[]}";
+    private static final String ONE_FINDING = "{\"score\":6,\"severity\":\"HIGH\",\"summary\":\"One issue.\","
+            + "\"findings\":[{\"title\":\"SQL injection\",\"severity\":\"HIGH\",\"description\":\"Query built by "
+            + "concatenation.\",\"file\":\"src/Small.java\",\"line\":1,\"suggestion\":\"Use a prepared statement.\"}]}";
 
     private JenkinsRule j;
     private FakeProvider llm;
@@ -296,9 +302,7 @@ class ForgeAIStepTest {
 
     @Test
     void writesSarifReportAndReturnsItsPath() throws Exception {
-        llm.response = "{\"score\":6,\"severity\":\"HIGH\",\"summary\":\"One issue.\",\"findings\":[{\"title\":\"SQL injection\","
-                + "\"severity\":\"HIGH\",\"description\":\"Query built by concatenation.\",\"file\":\"src/Small.java\","
-                + "\"line\":1,\"suggestion\":\"Use a prepared statement.\"}]}";
+        llm.response = ONE_FINDING;
         WorkflowJob p = j.createProject(WorkflowJob.class, "sarif");
 
         WorkflowRun b = run(p, "def r = forgeAI(analyzers: ['vulnerability'], sourceGlob: 'src/**/*.java')\n"
@@ -310,6 +314,115 @@ class ForgeAIStepTest {
         assertTrue(sarif.contains("\"ruleId\": \"forgeai/vulnerability\""), sarif);
         assertTrue(sarif.contains("\"uri\": \"src/Small.java\""), sarif);
         assertTrue(sarif.contains("\"level\": \"error\""), sarif);
+    }
+
+    // ── build page and trend ──────────────────────────────────────────
+
+    @Test
+    void buildKeepsTheAnalysisAndShowsItOnItsPage() throws Exception {
+        llm.response = ONE_FINDING;
+        WorkflowJob p = j.createProject(WorkflowJob.class, "page");
+
+        WorkflowRun b = run(p, "forgeAI analyzers: ['vulnerability'], sourceGlob: 'src/**/*.java'", Result.SUCCESS);
+
+        ForgeAIBuildAction a = b.getAction(ForgeAIBuildAction.class);
+        assertNotNull(a, "the build should keep the analysis");
+        assertEquals("6.0", a.getCompositeScoreText());
+        assertEquals("CAUTION", a.getVerdict());
+        assertEquals("OFF", a.getGateStatus());
+        assertEquals(1, a.getTotalFindings());
+        assertEquals("src/Small.java:1", a.getFindingRows().get(0).getLocation());
+
+        try (JenkinsRule.WebClient wc = j.createWebClient()) {
+            wc.setJavaScriptEnabled(false);
+            String page = wc.getPage(b, ForgeAIBuildAction.URL_NAME).asNormalizedText();
+            assertTrue(page.contains("SQL injection"), page);
+            assertTrue(page.contains("src/Small.java:1"), page);
+            assertTrue(page.contains("Use a prepared statement."), page);
+            assertTrue(page.contains("CAUTION"), page);
+
+            String buildPage = wc.getPage(b).asNormalizedText();
+            assertTrue(buildPage.contains("6.0/10"), "the build page should summarize the score: " + buildPage);
+        }
+    }
+
+    @Test
+    void buildFailedByTheGateStillKeepsTheAnalysis() throws Exception {
+        cfg.setFailOnCritical(true);
+        cfg.setCriticalThreshold(3);
+        llm.response = LOW_SCORE;
+
+        WorkflowRun b = run("forgeAI analyzers: ['code-review'], sourceGlob: 'src/**/*.java'", Result.FAILURE);
+
+        ForgeAIBuildAction a = b.getAction(ForgeAIBuildAction.class);
+        assertNotNull(a, "a failed gate should not lose the analysis");
+        assertEquals("2.0", a.getCompositeScoreText());
+        assertEquals("FAILED", a.getGateStatus());
+        assertEquals("Quality gate failed: score below 3", a.getGateText());
+    }
+
+    @Test
+    void analysisSurvivesAReloadWithoutTheRawResponse() throws Exception {
+        llm.response = ONE_FINDING;
+        WorkflowJob p = j.createProject(WorkflowJob.class, "reload");
+        run(p, "forgeAI analyzers: ['vulnerability'], sourceGlob: 'src/**/*.java'", Result.SUCCESS);
+
+        String xml = Files.readString(new File(p.getBuildByNumber(1).getRootDir(), "build.xml").toPath());
+        assertTrue(xml.contains("SQL injection"), "findings are stored with the build");
+        assertFalse(xml.contains("rawMarkdown"), "the raw LLM response is left out of the build record");
+
+        j.jenkins.reload();
+
+        WorkflowRun b = j.jenkins.getItemByFullName("reload", WorkflowJob.class).getBuildByNumber(1);
+        ForgeAIBuildAction a = b.getAction(ForgeAIBuildAction.class);
+        assertNotNull(a);
+        assertSame(b, a.getRun());
+        assertEquals("6.0", a.getCompositeScoreText());
+        assertEquals("SQL injection", a.getFindingRows().get(0).getTitle());
+    }
+
+    @Test
+    void jobShowsTheScoreTrend() throws Exception {
+        WorkflowJob p = j.createProject(WorkflowJob.class, "trend");
+        String step = "forgeAI analyzers: ['code-review'], sourceGlob: 'src/**/*.java'";
+        llm.response = HIGH_SCORE;
+        run(p, step, Result.SUCCESS);
+        llm.response = LOW_SCORE;
+        run(p, step, Result.SUCCESS);
+
+        ForgeAIJobAction trend = p.getAction(ForgeAIJobAction.class);
+        assertNotNull(trend, "a job whose builds ran ForgeAI should show the trend");
+        List<ForgeAIJobAction.Point> points = trend.getTrend();
+        assertEquals(2, points.size());
+        assertEquals(1, points.get(0).getNumber(), "oldest build first");
+        assertEquals(9.0, points.get(0).getScore());
+        assertEquals(2.0, points.get(1).getScore());
+
+        ForgeAIJobAction.Chart chart = trend.getChart();
+        List<ForgeAIJobAction.Point> plotted = chart.getPoints();
+        assertTrue(plotted.get(0).getY() < plotted.get(1).getY(), "a higher score is drawn higher up");
+        assertTrue(plotted.get(0).getX() < plotted.get(1).getX(), "later builds are further right");
+        assertEquals(plotted.get(0).getX() + "," + plotted.get(0).getY() + " "
+                + plotted.get(1).getX() + "," + plotted.get(1).getY(), chart.getPolyline());
+
+        try (JenkinsRule.WebClient wc = j.createWebClient()) {
+            wc.setJavaScriptEnabled(false);
+            String jobPage = wc.getPage(p).asXml();
+            assertTrue(jobPage.contains("forgeai-chart"), "the job page should show the chart");
+
+            String history = wc.getPage(p, ForgeAIJobAction.URL_NAME).asNormalizedText();
+            assertTrue(history.contains("#1") && history.contains("#2"), history);
+            assertTrue(history.contains("SHIP IT") && history.contains("BLOCK"), history);
+        }
+    }
+
+    @Test
+    void jobsThatNeverRanForgeAIShowNoTrend() throws Exception {
+        WorkflowJob p = j.createProject(WorkflowJob.class, "plain");
+        p.setDefinition(new CpsFlowDefinition("echo 'no analysis here'", true));
+        j.buildAndAssertSuccess(p);
+
+        assertNull(p.getAction(ForgeAIJobAction.class));
     }
 
     // ── helpers ───────────────────────────────────────────────────────

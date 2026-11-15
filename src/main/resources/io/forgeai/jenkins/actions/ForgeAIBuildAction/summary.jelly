@@ -1,0 +1,14 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:t="/lib/hudson">
+  <t:summary icon="symbol-flame-outline plugin-ionicons-api">
+    <a href="${it.urlName}/">ForgeAI</a>:
+    <j:choose>
+      <j:when test="${it.scored}">
+        composite score <strong>${it.compositeScoreText}/10</strong>, ${it.verdict}.
+        ${it.totalFindings} finding(s), ${it.criticalCount} critical.
+      </j:when>
+      <j:otherwise>no analyzer produced a result.</j:otherwise>
+    </j:choose>
+    ${it.gateText}.
+  </t:summary>
+</j:jelly>

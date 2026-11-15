@@ -13,6 +13,14 @@ public final class ForgeAIReportGenerator {
 
     private ForgeAIReportGenerator() {}
 
+    /** SHIP IT (8 or more), CAUTION (6 to 7.9), HOLD (4 to 5.9) or BLOCK (below 4). */
+    public static String verdict(double compositeScore) {
+        if (compositeScore >= 8) return "SHIP IT";
+        if (compositeScore >= 6) return "CAUTION";
+        if (compositeScore >= 4) return "HOLD";
+        return "BLOCK";
+    }
+
     @SuppressFBWarnings(value = "VA_FORMAT_STRING_USES_NEWLINE",
             justification = "HTML output intentionally uses \\n, not platform-dependent %n")
     public static String generateHtml(List<AnalysisResult> results, String projectName,
@@ -32,9 +40,7 @@ public final class ForgeAIReportGenerator {
         long highCount = results.stream()
                 .mapToLong(r -> r.countBySeverity("HIGH")).sum();
 
-        String verdict = compositeScore >= 8 ? "SHIP IT" :
-                compositeScore >= 6 ? "CAUTION" :
-                        compositeScore >= 4 ? "HOLD" : "BLOCK";
+        String verdict = verdict(compositeScore);
         String verdictColor = compositeScore >= 8 ? "#22c55e" :
                 compositeScore >= 6 ? "#eab308" :
                         compositeScore >= 4 ? "#f97316" : "#ef4444";

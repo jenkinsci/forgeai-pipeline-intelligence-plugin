@@ -1,0 +1,27 @@
+<?jelly escape-by-default='true'?>
+<!-- The composite-score trend as an SVG line chart. All coordinates are computed in ForgeAIJobAction.Chart. -->
+<j:jelly xmlns:j="jelly:core">
+  <j:set var="c" value="${it.chart}"/>
+  <svg xmlns="http://www.w3.org/2000/svg" class="forgeai-chart" viewBox="0 0 ${c.width} ${c.height}"
+       role="img" aria-label="${c.summary}">
+    <title>${c.summary}</title>
+    <j:forEach var="g" items="${c.grid}">
+      <line class="forgeai-chart__grid" x1="${c.left}" x2="${c.right}" y1="${g.y}" y2="${g.y}"/>
+      <text class="forgeai-chart__axis" x="${c.left - 6}" y="${g.labelY}" text-anchor="end">${g.label}</text>
+    </j:forEach>
+    <j:if test="${c.hasThreshold}">
+      <line class="forgeai-chart__gate" x1="${c.left}" x2="${c.right}" y1="${c.thresholdY}" y2="${c.thresholdY}"/>
+      <text class="forgeai-chart__axis" x="${c.right}" y="${c.thresholdY - 4}" text-anchor="end">${c.thresholdLabel}</text>
+    </j:if>
+    <polyline class="forgeai-chart__line" points="${c.polyline}"/>
+    <j:forEach var="p" items="${c.points}">
+      <a href="${rootURL}/${p.url}">
+        <circle class="forgeai-chart__dot forgeai-fill-${p.band}" cx="${p.x}" cy="${p.y}" r="4.5">
+          <title>${p.displayName}: ${p.scoreText}/10, ${p.verdict}</title>
+        </circle>
+      </a>
+    </j:forEach>
+    <text class="forgeai-chart__axis" x="${c.left}" y="${c.height - 6}">${c.firstLabel}</text>
+    <text class="forgeai-chart__axis" x="${c.right}" y="${c.height - 6}" text-anchor="end">${c.lastLabel}</text>
+  </svg>
+</j:jelly>
